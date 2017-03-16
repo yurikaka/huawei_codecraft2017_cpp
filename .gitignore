@@ -27,3 +27,11 @@
 *.exe
 *.out
 *.app
+
+cdn/cmake-build-debug
+cdn/.idea
+cdn/bin
+bin/*
+build/*
+!bin/.gitkeep
+!build/.gitkeep
