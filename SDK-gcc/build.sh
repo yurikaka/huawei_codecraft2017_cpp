@@ -20,9 +20,13 @@ then
     exit
 fi
 
-cp cdn/deploy.cpp SDK-gcc/cdn/deploy.cpp
-cp cdn/deploy.h SDK-gcc/cdn/deploy.h
-cd SDK-gcc
-sh build.sh
+rm -fr bin
+mkdir bin
+rm -fr build
+mkdir build
+cd build
+cmake ../cdn
+make
 
-mv cdn.tar.gz ../
+cd ..
+tar -zcPf cdn.tar.gz *
