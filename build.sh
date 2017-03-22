@@ -26,3 +26,5 @@ cd SDK-gcc
 sh build.sh
 
 mv cdn.tar.gz ../
+touch bin/.gitkeep
+touch build/.gitkeep

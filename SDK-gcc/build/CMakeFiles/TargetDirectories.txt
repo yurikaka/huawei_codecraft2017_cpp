@@ -1,3 +1,0 @@
-/home/yurikaka/Downloads/dev/huawei/huawei_cpp/SDK-gcc/build/CMakeFiles/edit_cache.dir
-/home/yurikaka/Downloads/dev/huawei/huawei_cpp/SDK-gcc/build/CMakeFiles/rebuild_cache.dir
-/home/yurikaka/Downloads/dev/huawei/huawei_cpp/SDK-gcc/build/CMakeFiles/cdn.dir

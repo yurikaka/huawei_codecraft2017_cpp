@@ -6,3 +6,7 @@ build/*
 !bin/.gitkeep
 !build/.gitkeep
 cdn.tar.gz
+SDK-gcc/bin/*
+SDK-gcc/build/*
+!SDK-gcc/bin/.gitkeep
+!SDK-gcc/build/.gitkeep
