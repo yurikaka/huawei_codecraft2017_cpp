@@ -1,20 +1,74 @@
 #include "deploy.h"
 #include <stdio.h>
 #include <string.h>
+#include <map>
+
+using namespace std;
+
+typedef struct _edge{
+    int cab;
+    int cost;
+}edge;
+
+typedef struct _customer{
+    int no_network;
+    int demand;
+}customer;
 
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 {
     char out[55000] = "";
     char temp[55000] = "";
-    int a,b,c;
-    int num_network, num_edge, num_custom;
+    int a,b,c,d;
+    int num_network, num_edge, num_custom,cost_server;
     sscanf(topo[0],"%d%d%d",&num_network,&num_edge,&num_custom);
+    sscanf(topo[2], "%d", &cost_server);
+    map<int,edge> edges[num_network];
+    for (int i = 4; i < 4 + num_edge; ++i){
+        sscanf(topo[i],"%d%d%d%d",&a,&b,&c,&d);
+        edges[a][b] = {c,d};
+        edges[b][a] = {c,d};
+    }
+    customer customers[num_custom];
+    int answer[num_custom];
     sprintf(out,"%d\n\n",num_custom);
     for (int i = line_num-num_custom; i < line_num; ++i) {
         sscanf(topo[i],"%d%d%d",&a,&b,&c);
-        sprintf(temp,"%d %d %d\n",b,a,c);
-        strcat(out,temp);
+        customers[a] = {b,c};
+        answer[a] = b;
+    }
+    map<int,edge>::iterator it;
+    for (int i = 0; i < num_custom; ++i){
+        if (answer[i] != customers[i].no_network)
+            continue;
+        for (int j = 0; j < num_custom; ++j){
+            if (i == j)
+                continue;
+            it = edges[customers[i].no_network].find(customers[j].no_network);
+            if (it != edges[customers[i].no_network].end() && it->second.cab >= min(customers[i].demand, customers[j].demand)){
+                if (customers[i].demand < customers[j].demand){
+                    if (customers[i].demand * it->second.cost <= cost_server){
+                        answer[i] = customers[j].no_network;
+                        break;
+                    }
+                } else {
+                    if (customers[j].demand * it->second.cost <= cost_server) {
+                        answer[j] = customers[i].no_network;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    for (int i = 0; i < num_custom; ++i){
+        if (answer[i] == customers[i].no_network){
+            sprintf(temp,"%d %d %d\n",answer[i],i,customers[i].demand);
+            strcat(out,temp);
+        } else {
+            sprintf(temp,"%d %d %d %d\n",answer[i],customers[i].no_network,i,customers[i].demand);
+            strcat(out,temp);
+        }
     }
 	// 需要输出的内容
 	char * topo_file = (char *)out;
