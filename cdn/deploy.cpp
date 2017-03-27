@@ -15,6 +15,29 @@ typedef struct _customer{
     int demand;
 }customer;
 
+/*
+int main() {
+    MinCostFlow<int,int> MCF;
+    for(int i = 0; i < 8; i++){
+        MCF.addV();
+    }
+    MCF.addEdge(0,1,5,0);
+    MCF.addEdge(0,2,2,0);
+    MCF.addEdge(2,3,7,2);
+    MCF.addEdge(1,2,3,1);
+    MCF.addEdge(1,3,3,4);
+    MCF.addEdge(3,6,1,8);
+    MCF.addEdge(3,5,7,5);
+    MCF.addEdge(3,4,5,2);
+    MCF.addEdge(4,5,3,1);
+    MCF.addEdge(6,7,1,0);
+    MCF.addEdge(5,7,4,0);
+    MCF.addEdge(4,7,2,0);
+
+    auto result = MCF.minCostFlow(0,7);
+    cout << "Flow   " << result.first <<"Cost  " <<result.second << endl;
+	return 0;
+}*/
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 {
