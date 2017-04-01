@@ -9,6 +9,8 @@
 #include <queue>
 #include <memory.h>
 #include <unordered_set>
+#include <vector>
+#include <iostream>
 
 using namespace std;
 
