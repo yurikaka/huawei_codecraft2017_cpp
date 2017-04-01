@@ -3,160 +3,10 @@
 char out[550000] = "";
 char temp[550000] = "";
 int count_flow = 0;
+//int all_cost = 0;
 
 
-template<class Flow = int, class Cost = int>
-struct MinCostFlow {
-    int DeployCost;
-    int NetNodeNums;
-    int EdgeNums;
-    int ConsumerNums;
-    int vs;
-    int vt;
-    int NeedSum = 0;
-    map<int,int> nc;
-    struct Edge {
-        int t;
-        Flow f;
-        Cost c;
-        Edge*next, *rev;
-        Edge(int _t, Flow _f, Cost _c, Edge*_next) :
-                t(_t), f(_f), c(_c), next(_next) {
-        }
-    };
 
-    vector<Edge*> E;
-
-    void addV() {
-        E.push_back((Edge*) 0);
-    }
-
-    Edge* makeEdge(int s, int t, Flow f, Cost c) {
-        return E[s] = new Edge(t, f, c, E[s]);
-    }
-
-    void addEdge(int s, int t, Flow f, Cost c) {
-        Edge*e1 = makeEdge(s, t, f, c), *e2 = makeEdge(t, s, 0, -c);
-        e1->rev = e2, e2->rev = e1;
-    }
-
-    pair<Flow, Cost> minCostFlow(int vs, int vt) { //flow,cost
-        auto n = E.size();
-        Flow flow = 0;
-        Cost cost = 0;
-//		const Cost MAX_COST = numeric_limits<Cost>::max();
-//		const Flow MAX_FLOW = numeric_limits<Flow>::max();
-        const Cost MAX_COST = ~0U >> 1;
-        const Flow MAX_FLOW = ~0U >> 1;
-        for (;;) {
-            vector<Cost> dist(n, MAX_COST);
-            vector<Flow> am(n, 0);
-            vector<Edge*> prev(n);
-            vector<bool> inQ(n, false);
-            queue<int> que;
-
-            dist[vs] = 0;
-            am[vs] = MAX_FLOW;
-            que.push(vs);
-            inQ[vs] = true;
-
-            while (!que.empty()) {
-                int u = que.front();
-                Cost c = dist[u];
-                que.pop();
-                inQ[u] = false;
-                for (Edge*e = E[u]; e; e = e->next)
-                    if (e->f > 0) {
-                        Cost nc = c + e->c;
-                        if (nc < dist[e->t]) {
-                            dist[e->t] = nc;
-                            prev[e->t] = e;
-                            am[e->t] = min(am[u], e->f);
-                            if (!inQ[e->t]) {
-                                que.push(e->t);
-                                inQ[e->t] = true;
-                            }
-                        }
-                    }
-            }
-
-            if (dist[vt] == MAX_COST)
-                break;
-            Flow by = am[vt];
-            int u = vt;
-            flow += by;
-            cost += by * dist[vt];
-            vector<int> prt;
-//            cout << "flow  "<<by << "   :";
-            while (u != vs) {
-                Edge*e = prev[u];
-                if(u != vs) prt.push_back(u);
-                e->f -= by;
-                e->rev->f += by;
-                u = e->rev->t;
-            }
-            //cout<< vs - 1;
-            int ccc = nc[prt[1]-1];
-            while(prt.size()>1){
-                sprintf(temp,"%d ",prt.back() - 1);
-                strcat(out,temp);
-                //cout << " " << prt.back() - 1;
-                prt.pop_back();
-            }
-            prt.pop_back();
-
-            //cout << "  "<<by;
-            sprintf(temp,"%d %d\n",ccc,by);
-            strcat(out,temp);
-            count_flow += 1;
-            //cout << endl;
-        }
-        return make_pair(flow, cost);
-    }
-    // 选取节点作为DeployNodes
-    // vector<int> DeployNodes
-    void BuildVS(vector<int> deployNodes){
-        for (auto node:deployNodes) {
-            addEdge(vs,node+1,INT32_MAX,0);
-        }
-    }
-
-    //读取文件建NetWork
-    void BuildNetWork(char *topo[2000]){
-//        freopen(file,"r",stdin);
-//        cin>>NetNodeNums;
-//        cin>>EdgeNums;
-//        cin>>ConsumerNums;
-        sscanf(topo[0],"%d %d %d",&NetNodeNums,&EdgeNums,&ConsumerNums);
-        //cin >> DeployCost;
-        sscanf(topo[2],"%d",&DeployCost);
-
-        for (int i = 0; i <= NetNodeNums+1; ++i) {
-            addV();
-        }
-        vs = 0;
-        string line;
-        vt = NetNodeNums+1;
-        int from,to,capacity,cost;
-        for (int i = 0; i < EdgeNums; ++i) {
-            sscanf(topo[4+i],"%d %d %d %d",&from,&to,&capacity,&cost);
-//            cin >> from >> to >> capacity >> cost;
-            addEdge(from+1,to+1,capacity,cost);
-            addEdge(to+1,from+1,capacity,cost);
-        }
-        //getline(cin,line);
-        // 添加消费节点到虚拟汇点得边
-        int consumer,netnode,need;
-        for (int i = 0; i < ConsumerNums; ++i) {
-//            cin >> consumer >> netnode >> need;
-            sscanf(topo[5 + i + EdgeNums],"%d %d %d",&consumer,&netnode,&need);
-            NeedSum += need;
-            nc[netnode] = consumer;
-//            sscanf(line.c_str(),"%d %d %d",&consumer, &netnode ,&need);
-            addEdge(netnode+1,vt,need,0);
-        }
-    }
-};
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 {
@@ -176,7 +26,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     cost_flow cf;
     int unordered_servers[customer_num];
     int distance[network_num+1][2];
-    vector<int> answer;
+//    vector<int> answer;
+    map<int,int> network_customer;
+    stack<int> stk;
     for (i = 4; i < edge_num + 4; ++i){
         sscanf(topo[i],"%d%d%d%d",&a,&b,&c,&d);
         edges[a][b] = {c,d,0,0};
@@ -190,6 +42,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         servers[b] = {c, 0};
         edges[network_num][b] = {INT_MAX,0,0,0};
         edges[b][network_num] = {INT_MAX,0,0,0};
+        network_customer[b] = a;
     }
     //删除无用边
     do {
@@ -311,19 +164,18 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     for (itu = server_del.begin(); itu != server_del.end(); ++itu)
         servers.erase(*itu);
 
-    for (its = servers.begin(); its != servers.end(); ++its){
-        //printf("%d,",its->first);
-        answer.push_back(its->first);
-    }
-
-    memset(distance, -1, sizeof(distance));
-    //断开服务器与超级汇点 将服务器节点的距离设为0 将服务器节点推入队列
+//    for (its = servers.begin(); its != servers.end(); ++its){
+//        printf("%d,",its->first);
+//        answer.push_back(its->first);
+//    }
+    //return;
+    //断开服务器与超级汇点
     for (its = servers.begin(); its != servers.end(); ++its){
         edges[network_num].erase(its->first);
         edges[its->first].erase(network_num);
-        distance[its->first][0] = 0;
-        distance[its->first][1] = -2;
-        extend.push(its->first);
+//        distance[its->first][0] = 0;
+//        distance[its->first][1] = -2;
+//        extend.push(its->first);
     }
     //将与消费节点相连的网络节点连上超级汇点 容量为消费节点的需求
     for (i = 0; i < customer_num; ++i){
@@ -335,8 +187,88 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
             ite->second.flow = 0;
             ite->second.t_flow = 0;
         }
+    for (its = servers.begin(); its != servers.end(); ++its){
+        if (network_customer.find(its->first) != network_customer.end()){
+            sprintf(temp,"%d %d %d\n",its->first,network_customer[its->first],customers[network_customer[its->first]].demand_usage_t);
+            strcat(out,temp);
+            edges[its->first].erase(network_num);
+            count_flow += 1;
+        }
+    }
+    a = 0;
+    while (true) {
+        //printf("start to find %d\n",a++);
+        //每次寻找一条最小费用流代替部分服务器负载
+        memset(distance, -1, sizeof(distance));
+        for (its = servers.begin(); its != servers.end(); ++its) {
+            extend.push(its->first);
+            distance[its->first][0] = 0;
+            distance[its->first][1] = -2;
+        }
+        max_price = server_cost;
+        //cf = mini_cost_flow(servers, edges, extend, b/a, a);
+        while (!extend.empty()) {
 
+            current = extend.front();
+            extend.pop();
 
+            //printf("get a node %d\n", current);
+            for (ite = edges[current].begin(); ite != edges[current].end(); ++ite) {
+                if (edges[current][ite->first].flow < edges[current][ite->first].cab
+                    && edges[current][ite->first].cost + distance[current][0] <= max_price)
+                    if (distance[ite->first][0] == -1 ||
+                        (distance[ite->first][0] > edges[current][ite->first].cost + distance[current][0])) {
+                        distance[ite->first][0] = edges[current][ite->first].cost + distance[current][0];
+                        distance[ite->first][1] = current;
+                        if (ite->first != network_num)
+                            extend.push(ite->first);
+                    }
+            }
+        }
+        //printf("%d\n",distance[network_num][0]);
+        if (distance[network_num][0] == -1)
+            break;
+        else {
+            current = distance[network_num][1];
+            min_flow = edges[current][network_num].cab - edges[current][network_num].flow;
+
+            while (distance[current][1] != -2) {
+                min_flow = min(min_flow, edges[distance[current][1]][current].cab -
+                                         edges[distance[current][1]][current].flow);
+                current = distance[current][1];
+            }
+//            cf.flow = min_flow;
+//            cf.cost = min_flow * distance[network_num][0];
+//            all_cost += min_flow * distance[network_num][0];
+
+            current = distance[network_num][1];
+            stk.push(network_customer[current]);
+            edges[current][network_num].flow += min_flow;
+            while (distance[current][1] != -2) {
+                stk.push(current);
+                edges[distance[current][1]][current].flow += min_flow;
+                current = distance[current][1];
+            }
+            stk.push(current);
+            while (!stk.empty()){
+                sprintf(temp,"%d ", stk.top());
+                stk.pop();
+                strcat(out,temp);
+            }
+            sprintf(temp,"%d\n", min_flow);
+            strcat(out,temp);
+            count_flow += 1;
+        }
+
+    }
+//    //jiancha xuqiu
+//    for (i = 0; i < customer_num; ++i){
+//        if (edges[customers[i].no_network_usage].find(network_num) != edges[customers[i].no_network_usage].end())
+//            printf("%d %d\n",edges[customers[i].no_network_usage][network_num].cab,edges[customers[i].no_network_usage][network_num].flow);
+//    }
+    sprintf(temp,"%d\n\n",count_flow);
+    strcat(temp,out);
+    //printf("cost = %d\n", all_cost+server_cost*servers.size());
 //    //输出所有边（测试）
 //    for (i = 0; i < network_num; ++i) {
 //        for (it = edges[i].begin(); it != edges[i].end(); ++it) {
@@ -344,15 +276,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 //        }
 //    }
 
-    MinCostFlow<int,int> MCF;
-    MCF.BuildNetWork(topo);
-    //vector<int> deployNodes{7,14,16,17,19,25,29,32,35,43,44,59,70,73,74,82,84,88,89,93,96,102,103,111,112,120,124,126,129,133,137,138,147,161,164,166,167,170,175,178,184,186,187,188,194,195,198,200,203,205,218,223,227,234,238,242,243,252,254,259,263,267,268,270,271,275,278,281,286,288,297,301,308,320,321,326,328,331,333,334,335,336,338,346,349,363,370,375,381,383,385,387,396,397,400,402,409,413,415,416,423,424,426,438,459,463,464,466,474,475,481,482,488,491,496,497,499,500,503,505,506,507,520,525,529,537,538,541,542,548,552,554,556,557,570,575,576,584,592,594,599,625,632,634,638,640,641,643,646,651,653,660,663,668,670,671,675,677,679,685,687,711,718,719,724,731,739,741,742,745,751,753,755,756,757,760,765,767,770,774,780,784,791,795,797};
-    MCF.BuildVS(answer);
-    auto result = MCF.minCostFlow(MCF.vs,MCF.vt);
-    cout << "Flow   " << result.first <<"   Cost  " <<result.second  + answer.size() * MCF.DeployCost<< endl;
-    cout << MCF.NeedSum<< endl;
-    sprintf(temp,"%d\n\n",count_flow);
-    strcat(temp,out);
+
     // 需要输出的内容
     char * topo_file = (char *)temp;
 
