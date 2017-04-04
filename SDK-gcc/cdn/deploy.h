@@ -3,7 +3,6 @@
 
 #include "lib_io.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <map>
 #include <limits.h>
@@ -11,7 +10,8 @@
 #include <memory.h>
 #include <unordered_set>
 #include <vector>
-#include <stack>
+#include <iostream>
+#include <algorithm>
 
 #include <assert.h>
 #include <time.h>
@@ -41,7 +41,6 @@ typedef struct _cost_flow{
 }cost_flow;
 
 void deploy_server(char * graph[MAX_EDGE_NUM], int edge_num, char * filename);
-
 
 
 #endif
