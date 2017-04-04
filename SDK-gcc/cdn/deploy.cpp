@@ -227,9 +227,11 @@ void getanswer(char * topo[MAX_EDGE_NUM], vector<int> answer){
             all_cost = current_cost;
             //strcpy(last, temp);
             best_answer = answer;
-        }
+        } else;
+            //printf("expensive\n");
     } else {
         current_cost = -1;
+        //printf("cannot\n");
         return;
     }
 }
@@ -281,7 +283,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     cost_flow cf;
     int unordered_servers[customer_num];
     int distance[network_num+1][2];
-    vector<int> answer;
+    vector<int> answer,answer1;
+    vector<int>::iterator ita;
     for (i = 4; i < edge_num + 4; ++i){
         sscanf(topo[i],"%d%d%d%d",&a,&b,&c,&d);
         edges[a][b] = {c,d,0,0};
@@ -453,14 +456,14 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 //    }
     //printf("answer = %d\n",answer.size());
     getanswer(topo,answer);
-    printf("cost %d\n",all_cost);
+    //printf("cost %d\n",all_cost);
     //printf("cost_ori = %d, time = %d\n",all_cost,print_time1("ori"));
     //printf("answer = %d\n",answer.size());
     //getanswer(topo,answer);
     //printf("answer = %d\n",answer.size());
 
     for (itu2 = server_del2.begin(); itu2 != server_del2.end(); ++itu2){
-        if (print_time1("time") > 85)
+        if (print_time1("time") > 10)
             break;
         //sprintf(out,"");
         //sprintf(temp,"");
@@ -600,8 +603,23 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         getanswer(topo,answer);
         //return;
     }
+    //printf("cost_ori %d %d\n", all_cost, answer.size());
+    while (print_time1("1") < 85) {
 
-
+        if (best_answer == answer)
+            break;
+        answer = best_answer;
+        for (ita = answer.begin(); ita != answer.end(); ++ita) {
+            if (print_time1("1") < 85) {
+                //printf("123\n");
+                answer1 = answer;
+                answer1.erase(answer1.begin() + (ita - answer.begin()));
+                //printf("%d\n", answer1.size());
+                getanswer(topo, answer1);
+            } else
+                break;
+        }
+    }
     //printf("cost = %d, time = %d\n",all_cost,print_time1("end"));
     // 需要输出的内容
 
@@ -630,10 +648,10 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         sprintf(temp, "%d\n\n", count_flow);
         strcat(temp, out);
 
-
+    //printf("cost = %d\n",all_cost);
     char * topo_file = (char *)temp;
 
     // 直接调用输出文件的方法输出到指定文件中(ps请注意格式的正确性，如果有解，第一行只有一个数据；第二行为空；第三行开始才是具体的数据，数据之间用一个空格分隔开)
     write_result(topo_file, filename);
-    printf("time = %d\n",print_time1("end"));
+    //printf("time = %d\n",print_time1("end"));
 }
