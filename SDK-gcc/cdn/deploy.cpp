@@ -463,7 +463,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     //printf("answer = %d\n",answer.size());
 
     for (itu2 = server_del2.begin(); itu2 != server_del2.end(); ++itu2){
-        if (print_time1("time") > 10)
+        if (network_num > 500)
+            break;
+        if (print_time1("time") > 15)
             break;
         //sprintf(out,"");
         //sprintf(temp,"");
@@ -604,13 +606,14 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         //return;
     }
     //printf("cost_ori %d %d\n", all_cost, answer.size());
-    while (print_time1("1") < 85) {
+    answer.clear();
+    while (print_time1("1") < 88) {
 
         if (best_answer == answer)
             break;
         answer = best_answer;
         for (ita = answer.begin(); ita != answer.end(); ++ita) {
-            if (print_time1("1") < 85) {
+            if (print_time1("1") < 88) {
                 //printf("123\n");
                 answer1 = answer;
                 answer1.erase(answer1.begin() + (ita - answer.begin()));

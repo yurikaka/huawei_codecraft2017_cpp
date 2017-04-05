@@ -1,5 +1,5 @@
 #include "deploy.h"
-
+// #define PRINTTIME
 char out[550000] = "";
 char temp[550000] = "";
 int count_flow = 0;
@@ -7,7 +7,10 @@ int flows = 0;
 int server_cost;
 int all_cost = INT_MAX;
 int current_cost;
-vector<int> best_answer;
+int flowtime = 0;
+vector <int> DirectNode;
+
+vector <int> best_answer;
 
 
 const int maxn = 20000,maxm = 50000, inf = 100000000;
@@ -60,17 +63,17 @@ struct MinCostFlow {
         }
 //        cout << "here";
         //0 8 40 // 注：消费节点0，相连网络节点ID为8，视频带宽消耗需求为40
+        bool d = DirectNode.empty();
         for (int i = 0; i < cnum; ++i) {
             int _c,_n,_need;
             sscanf(topo[5 + i + edgenum],"%d %d %d",&_c,&_n,&_need);
-//            cout<<"line number     "<<5 + i + edgenum << "   here  ";
-            //cout <<_c << _n << _need << endl;
-//            cin >> _c >> _n >> _need;
+            if(d){
+                DirectNode.push_back(_n);
+            }
             addedge(_n,sink,_need,0);
             needsum += _need;
             net2cons[_n] = _c;
         }
-//        cout << "here";
     }
 
 
@@ -78,7 +81,6 @@ struct MinCostFlow {
 
         for(auto s:server){
             addedge(src,s,INT32_MAX,0);
-//            cout<<"line number     "<<s<< "   here  "<< src;
         }
     }
     queue<int> que;
@@ -96,10 +98,9 @@ struct MinCostFlow {
         while (!que.empty()) que.pop();
         que.push(src);
         inQue[src] = true;
-//        cout << "here" << endl;
+
         while(!que.empty()){
             int u = que.front();
-//            cout << que.size() << endl;
             que.pop();
             for(int i = g[u];i; i = e[i].nxt){
                 if(e[i].f > 0 && dist[u] + e[i].w < dist[e[i].v]){
@@ -146,7 +147,6 @@ struct MinCostFlow {
         int cur = 0,ans = 0;
         while (findpath()){
             cur += augment();
-//            cout<<cur<<endl;
             if(cur > ans) ans = cur;
         }
         return ans;
@@ -198,10 +198,12 @@ struct MinCostFlow {
     }
 };
 
+MinCostFlow MCF;
 
 void getanswer(char * topo[MAX_EDGE_NUM], vector<int> answer){
+    flowtime ++;
     flows = 0;
-    MinCostFlow MCF;
+
     memset(MCF.e,0,sizeof(MCF.e));
     memset(MCF.g,0,sizeof(MCF.g));
     memset(MCF.dist,63,sizeof(MCF.dist));
@@ -209,20 +211,13 @@ void getanswer(char * topo[MAX_EDGE_NUM], vector<int> answer){
     memset(MCF.preV,0,sizeof(MCF.preV));
     memset(MCF.preE,0, sizeof(MCF.preE));
     MCF.buildflow(topo);
-//    cout << "here";
-    //vector<int> deployNodes{7,14,16,17,19,25,29,32,35,43,44,59,70,73,74,82,84,88,89,93,96,102,103,111,112,120,124,126,129,133,137,138,147,161,164,166,167,170,175,178,184,186,187,188,194,195,198,200,203,205,218,223,227,234,238,242,243,252,254,259,263,267,268,270,271,275,278,281,286,288,297,301,308,320,321,326,328,331,333,334,335,336,338,346,349,363,370,375,381,383,385,387,396,397,400,402,409,413,415,416,423,424,426,438,459,463,464,466,474,475,481,482,488,491,496,497,499,500,503,505,506,507,520,525,529,537,538,541,542,548,552,554,556,557,570,575,576,584,592,594,599,625,632,634,638,640,641,643,646,651,653,660,663,668,670,671,675,677,679,685,687,711,718,719,724,731,739,741,742,745,751,753,755,756,757,760,765,767,770,774,780,784,791,795,797};
+
     MCF.buildSource(answer);
 
     auto result = MCF.minconstflow();
     if (MCF.can()) {
         current_cost = result + server_cost * answer.size();
-        //printf("cost = %d\n",result+server_cost*answer.size());
-//    cout << "here" ;
-        //cout << "Flow   " << result.first <<"   Cost  " <<result.second  + answer.size() * MCF.DeployCost<< endl;
-        //cout << MCF.NeedSum<< endl;
-        //while (MCF.printPath(sink));
-        //sprintf(temp, "%d\n\n", count_flow);
-        //strcat(temp, out);
+
         if (current_cost < all_cost) {
             all_cost = current_cost;
             //strcpy(last, temp);
@@ -259,7 +254,7 @@ int print_time1(const char *head)
         out_ms1 += 1000;
         out_s1 -= 1;
     }
-    //printf("%s date/time is: %s \tused time is %lu s %d ms.\n", head, asctime(timeinfo1), out_s1, out_ms1);
+//    printf("%s date/time is: %s \tused time is %lu s %d ms.\n", head, asctime(timeinfo1), out_s1, out_ms1);
     return out_s1;
 }
 
@@ -432,14 +427,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     for (its = servers.begin(); its != servers.end(); ++its){
         edges[network_num].erase(its->first);
         edges[its->first].erase(network_num);
-//        distance[its->first][0] = 0;
-//        distance[its->first][1] = -2;
-//        extend.push(its->first);
+
     }
-    //将与消费节点相连的网络节点连上超级汇点 容量为消费节点的需求
-//    for (i = 0; i < customer_num; ++i){
-//        edges[customers[i].no_network_usage][network_num] = {customers[i].demand_usage_t,0,0,0};
-//    }
+
 
     for (i = 0; i < network_num; ++i)
         for (ite = edges[i].begin(); ite != edges[i].end(); ++ite) {
@@ -448,22 +438,18 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         }
 
 
-//    //输出所有边（测试）
-//    for (i = 0; i < network_num; ++i) {
-//        for (it = edges[i].begin(); it != edges[i].end(); ++it) {
-//            printf("%d %d %d %d %d %d\n", i, it->first, it->second.cab, it->second.cost, it->second.flow, it->second.t_flow);
-//        }
-//    }
+
     //printf("answer = %d\n",answer.size());
     getanswer(topo,answer);
-    //printf("cost %d\n",all_cost);
-    //printf("cost_ori = %d, time = %d\n",all_cost,print_time1("ori"));
-    //printf("answer = %d\n",answer.size());
-    //getanswer(topo,answer);
-    //printf("answer = %d\n",answer.size());
+#ifdef PRINTTIME
+    printf("original consumer node cost %d\n",all_cost);
+#endif
+
+//    printf("cost_ori = %d, time = %d\n",all_cost,print_time1("ori"));
+
 
     for (itu2 = server_del2.begin(); itu2 != server_del2.end(); ++itu2){
-        if (print_time1("time") > 10)
+        if (print_time1("time") > 9)
             break;
         //sprintf(out,"");
         //sprintf(temp,"");
@@ -577,14 +563,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
         for (its = servers.begin(); its != servers.end(); ++its){
             edges[network_num].erase(its->first);
             edges[its->first].erase(network_num);
-//        distance[its->first][0] = 0;
-//        distance[its->first][1] = -2;
-//        extend.push(its->first);
+
         }
-        //将与消费节点相连的网络节点连上超级汇点 容量为消费节点的需求
-//    for (i = 0; i < customer_num; ++i){
-//        edges[customers[i].no_network_usage][network_num] = {customers[i].demand_usage_t,0,0,0};
-//    }
+
 
         for (i = 0; i < network_num; ++i)
             for (ite = edges[i].begin(); ite != edges[i].end(); ++ite) {
@@ -592,25 +573,19 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
                 ite->second.t_flow = 0;
             }
 
-
-//    //输出所有边（测试）
-//    for (i = 0; i < network_num; ++i) {
-//        for (it = edges[i].begin(); it != edges[i].end(); ++it) {
-//            printf("%d %d %d %d %d %d\n", i, it->first, it->second.cab, it->second.cost, it->second.flow, it->second.t_flow);
-//        }
-//    }
-        //printf("ans = %d\n",answer.size());
         getanswer(topo,answer);
-        //return;
+
     }
-    //printf("cost_ori %d %d\n", all_cost, answer.size());
-    while (print_time1("1") < 85) {
+#ifdef PRINTTIME
+    printf("delete add node opt cost_ori %d %d\n", all_cost, print_time1("mid"));
+#endif
+    while (print_time1("1") < 89) {
 
         if (best_answer == answer)
             break;
         answer = best_answer;
         for (ita = answer.begin(); ita != answer.end(); ++ita) {
-            if (print_time1("1") < 85) {
+            if (print_time1("1") < 89) {
                 //printf("123\n");
                 answer1 = answer;
                 answer1.erase(answer1.begin() + (ita - answer.begin()));
@@ -620,12 +595,46 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
                 break;
         }
     }
-    //printf("cost = %d, time = %d\n",all_cost,print_time1("end"));
+#ifdef PRINTTIME
+    printf("odered delete node cost = %d, time = %d\n",all_cost,print_time1("end"));
+#endif
+
+
+    // 把直连的点不在best_answer中的加上看看能不能有优化：
+    vector<int> tmpbest,tmpbest2;
+
+    for (auto Dite = DirectNode.begin(); Dite != DirectNode.end(); ++Dite) {
+        if (print_time1("time") > 88)
+            break;
+//        cout <<*Dite<<endl;
+        tmpbest = best_answer;
+        auto _b = tmpbest.begin();
+        auto _e = tmpbest.end();
+        auto it = find(_b,_e,*Dite);
+        if(it == _e){
+            for(int _i = 0; _i < tmpbest.size();++_i){
+            	if (print_time1("time") > 88)
+            		break;
+//                cout << "here" << endl;
+                tmpbest2 = tmpbest;
+                tmpbest2.erase(tmpbest2.begin() + _i);
+//                cout << "here" << endl;
+                tmpbest2.push_back(*Dite);
+//                cout << "here" << endl;
+                getanswer(topo,tmpbest2);
+//                cout << "here" << endl;
+            }
+        }
+    }
+
+#ifdef PRINTTIME
+    printf("add directnode opt = %d, time = %d\n",all_cost,print_time1("end"));
+#endif
     // 需要输出的内容
 
 
     flows = 0;
-    MinCostFlow MCF;
+//    MinCostFlow MCF;
     memset(MCF.e,0,sizeof(MCF.e));
     memset(MCF.g,0,sizeof(MCF.g));
     memset(MCF.dist,63,sizeof(MCF.dist));
@@ -633,13 +642,12 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
     memset(MCF.preV,0,sizeof(MCF.preV));
     memset(MCF.preE,0, sizeof(MCF.preE));
     MCF.buildflow(topo);
-//    cout << "here";
-    //vector<int> deployNodes{7,14,16,17,19,25,29,32,35,43,44,59,70,73,74,82,84,88,89,93,96,102,103,111,112,120,124,126,129,133,137,138,147,161,164,166,167,170,175,178,184,186,187,188,194,195,198,200,203,205,218,223,227,234,238,242,243,252,254,259,263,267,268,270,271,275,278,281,286,288,297,301,308,320,321,326,328,331,333,334,335,336,338,346,349,363,370,375,381,383,385,387,396,397,400,402,409,413,415,416,423,424,426,438,459,463,464,466,474,475,481,482,488,491,496,497,499,500,503,505,506,507,520,525,529,537,538,541,542,548,552,554,556,557,570,575,576,584,592,594,599,625,632,634,638,640,641,643,646,651,653,660,663,668,670,671,675,677,679,685,687,711,718,719,724,731,739,741,742,745,751,753,755,756,757,760,765,767,770,774,780,784,791,795,797};
+
     MCF.buildSource(best_answer);
 
     auto result = MCF.minconstflow();
 
-        current_cost = result + server_cost * answer.size();
+    current_cost = result + server_cost * answer.size();
         //printf("cost = %d\n",result+server_cost*answer.size());
 //    cout << "here" ;
         //cout << "Flow   " << result.first <<"   Cost  " <<result.second  + answer.size() * MCF.DeployCost<< endl;
@@ -653,5 +661,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num,char * filename)
 
     // 直接调用输出文件的方法输出到指定文件中(ps请注意格式的正确性，如果有解，第一行只有一个数据；第二行为空；第三行开始才是具体的数据，数据之间用一个空格分隔开)
     write_result(topo_file, filename);
-    //printf("time = %d\n",print_time1("end"));
+#ifdef PRINTTIME
+    printf("time = %d\n",print_time1("end"));
+    cout << flowtime;
+#endif
 }
