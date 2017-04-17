@@ -18,9 +18,10 @@ extern const int NODEMAX, EDGEMAX, INF;
 unordered_map<int,pair<int,int>> Level;
 int positionPrice[NODEMAX + 10];
 
-MCMF MCF;
+bool push_better;
+bool pushable;
 
-/*************************************************/
+MCMF MCF;
 
 //返回当前经过的时间
 int return_time()
@@ -124,6 +125,43 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			//printf("num of servers = %lu, cost = %d\n", answer.size(), all_cost);
 		}
 		--num_sround_min;
+	}
+
+	vector<int> cheaper;
+	vector<int>::iterator itc;
+
+	vector<pair<int,int>>::iterator ita;
+	servers= best_answer;
+	int old;
+	int current_edge;
+	answer.clear();
+	for (ita = servers.begin(); ita != servers.end(); ++ita){
+		answer.push_back(ita->first);
+	}
+	cout << "begin move at " << all_cost << endl;
+	for (ita = servers.begin(); ita != servers.end();){
+//        cout << ita - answer.begin() << endl;
+		cheaper.clear();
+		old = ita->first;
+		current_edge = MCF.G[old];
+		while (current_edge){
+			if (current_edge %2 == 1 || MCF.edge[current_edge].to == MCF.vSource ||MCF.edge[current_edge].to == MCF.vSink){
+				current_edge = MCF.edge[current_edge].next;
+				continue;
+			}
+			if (positionPrice[MCF.edge[current_edge].to] < positionPrice[old])
+				if (find(answer.begin(),answer.end(),MCF.edge[current_edge].to) == answer.end())
+					cheaper.push_back(MCF.edge[current_edge].to);
+			current_edge = MCF.edge[current_edge].next;
+		}
+		for (itc = cheaper.begin(); itc != cheaper.end(); ++itc){
+			ita->first = *itc;
+			MCF.getTotalCost(servers);
+		}
+		servers = best_answer;
+		*(answer.begin() + (ita - servers.begin())) = ita->first;
+		if (ita->first == old)
+			++ita;
 	}
 
 	servers = best_answer;

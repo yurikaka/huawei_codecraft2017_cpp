@@ -52,6 +52,9 @@ const int NODEMAX = 10005, EDGEMAX = 20000, INF = 0x3f3f3f3f ;
 extern unordered_map<int,pair<int,int>> Level;
 extern int positionPrice[NODEMAX + 10];
 
+extern bool push_better;
+extern bool pushable;
+
 //edge 的定义
 struct Edge{
     Edge(){};
@@ -447,15 +450,17 @@ struct MCMF{
 
 /*+++++++++++++++获取整个cost信息++++++++++++++++++*/
     //首先默认为最高级，然后根据求得的结果以及百分比，来优化等级信息
-    void getTotalCost(vector<int> servers,double percent){
-
+    bool getTotalCost(vector<int> servers,double percent){
+        bool better = false;
+        push_better = false;
+        pushable = false;
         clear();
         // 默认为用的最高级的case
         buildSource(servers);
         auto beforeResult = solve();
         if(!isFeasibleFlow()){
             current_cost = -1;
-            return;
+            return false;
         }
         int beforeTotalCost = 0;
         int afterTotalCost = 0;
@@ -515,10 +520,13 @@ struct MCMF{
         afterTotalCost = server_position_cost - decreasePostionCost + after_server_level_cost + afterResult;
 
         if (isFeasibleFlow()) {
+            pushable = true;
             if (afterTotalCost < beforeTotalCost){
+                push_better = true;
                 if(afterTotalCost < all_cost){
                     all_cost = afterTotalCost;
                     best_answer = newServers;
+                    better = true;
                 }else{
                     //cout << "expensive" <<endl;
                 }
@@ -526,6 +534,7 @@ struct MCMF{
                 if(beforeTotalCost < all_cost){
                     all_cost = beforeTotalCost;
                     best_answer = origiServers;
+                    better = true;
                 }else{
                     //cout << "expensive" <<endl;
                 }
@@ -535,12 +544,39 @@ struct MCMF{
             if(beforeTotalCost < all_cost){
                 all_cost = beforeTotalCost;
                 best_answer = origiServers;
+                better = true;
             }else{
                 //cout << "expensive" <<endl;
             }
             clear();
             buildSource(best_answer);
             solve();
+        }
+        return better;
+    }
+
+    //输入服务器等级，计算总cost
+    bool getTotalCost(vector<pair<int,int>> servers){
+        clear();
+        // 默认为用的最高级的case
+        buildSource(servers);
+        auto flowTotalCost = solve();
+        if(!isFeasibleFlow()){
+            return false;
+        }
+        int positionPriceTotal = 0;
+        int serverLevelPrice = 0;
+        for(auto server: servers){
+            positionPriceTotal += positionPrice[server.first];
+            serverLevelPrice += Level[server.second].second;
+        }
+        int totalPrice = positionPriceTotal + serverLevelPrice + flowTotalCost;
+        if(totalPrice < all_cost) {
+            best_answer = servers;
+            all_cost = totalPrice;
+            return true;
+        }else{
+            return false;
         }
     }
 };
