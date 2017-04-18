@@ -134,7 +134,7 @@ struct MCMF{
         vSource = nodeNumber;
 
         int level = 0,bandwidth = 0,price = 0;
-        for(pos = 2; pos < 12; ++pos){
+        for(pos = 2; pos < 13; ++pos){
             if(topo[pos][0] == '\n' || topo[pos][0] == '\r' || topo[pos][0] == '\0') {
                 maxBandWidth = bandwidth;
                 break;

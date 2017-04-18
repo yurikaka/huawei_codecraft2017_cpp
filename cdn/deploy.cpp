@@ -62,17 +62,22 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	MCF.clear();
 	MCF.buildGraph(topo);
 
-	int time_max;
-//	if (MCF.nodeNumber < 1000)
-		time_max = 87;
-//	else
-//		time_max = 80;
+    //todo change time limit
+	int time_max[4] = {5,40,44,87};
+
 
 	MCF.getTotalCost(DirectNode, 0);
 	printf("direct cost is %d \n", all_cost);
+    cout << endl;
+
+    cout << "begin move1 at " << return_time() << " second" << endl;
+    cout << "begin move1 at " << all_cost << " cost" << endl;
+    cout << endl;
 
 	servers = best_answer;
 	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
+        if (return_time() > time_max[0])
+            break;
 		bool flag = true;
 		int cost_flow = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
 		while (flag && positionPrice[it->first] != min_node_cost) {
@@ -98,17 +103,24 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			answer.push_back(it->first);
 	}
 	MCF.getTotalCost(answer, 0);
-	printf("cost = %d\n", all_cost);
+
+    cout << "begin delete at " << return_time() << " second" << endl;
+    cout << "begin delete at " << all_cost << " cost" << endl;
+    cout << endl;
 
 	int num_sround_min = 5;
 	int num_sround;
 	pair<int, int> tmp_first;
 	pair<int, int> tmp_back;
 	while (num_sround_min >= 1) {
+        if (return_time() > time_max[1])
+            break;
 		servers = best_answer;
 		sort(servers.begin(), servers.end(), cmp);
 		tmp_back = servers.back();
 		while (servers.front() != tmp_back) {
+            if (return_time() > time_max[1])
+                break;
 			tmp_first = servers.front();
 			servers.erase(servers.begin());
 			answer.clear();
@@ -117,6 +129,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			}
 			num_sround = 0;
 			for (int i = MCF.G[tmp_first.first]; i; i = MCF.edge[i].next) {
+                if (return_time() > time_max[1])
+                    break;
 				if (i % 2 == 1)
 					continue;
 				if (MCF.edge[i].to == MCF.vSink || MCF.edge[i].to == MCF.vSource)
@@ -136,6 +150,11 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 		--num_sround_min;
 	}
 
+
+    cout << "begin move2 at " << return_time() << " second" << endl;
+    cout << "begin move2 at " << all_cost << " cost" << endl;
+    cout << endl;
+
 	vector<int> cheaper;
 	vector<int>::iterator itc;
 
@@ -147,13 +166,17 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	for (ita = servers.begin(); ita != servers.end(); ++ita){
 		answer.push_back(ita->first);
 	}
-	cout << "begin move at " << all_cost << endl;
+
 	for (ita = servers.begin(); ita != servers.end();){
+        if (return_time() > time_max[2])
+            break;
 //        cout << ita - answer.begin() << endl;
 		cheaper.clear();
 		old = ita->first;
 		current_edge = MCF.G[old];
 		while (current_edge){
+            if (return_time() > time_max[2])
+                break;
 			if (current_edge %2 == 1 || MCF.edge[current_edge].to == MCF.vSource ||MCF.edge[current_edge].to == MCF.vSink){
 				current_edge = MCF.edge[current_edge].next;
 				continue;
@@ -164,6 +187,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			current_edge = MCF.edge[current_edge].next;
 		}
 		for (itc = cheaper.begin(); itc != cheaper.end(); ++itc){
+            if (return_time() > time_max[2])
+                break;
 			ita->first = *itc;
 			MCF.getTotalCost(servers);
 		}
@@ -173,6 +198,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			++ita;
 	}
 
+    cout << "begin add delete at " << return_time() << " second" << endl;
+    cout << "begin add delete at " << all_cost << " cost" << endl;
+    cout << endl;
 
 	servers = best_answer;
 	answer.clear();
@@ -184,12 +212,12 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	vector<int> good;
 	good = ReplaceNodes;
 	for (itc = good.begin(); itc != good.end(); ++itc){
-		if (return_time() > time_max)
+		if (return_time() > time_max[3])
 			break;
 		if (find(answer.begin(),answer.end(),*itc) == answer.end()){
 			answer.push_back(*itc);
 			for (itc2 = answer.begin(); itc2 != answer.end()-1; ){
-				if (return_time() > time_max)
+				if (return_time() > time_max[3])
 					break;
 				answer1 = answer;
 				answer1.erase(answer1.begin() + (itc2 - answer.begin()));
@@ -201,7 +229,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			}
 		}
 	}
-
+    cout << "begin push at " << return_time() << " second" << endl;
+    cout << "begin push at " << all_cost << " cost" << endl;
+    cout << endl;
 
 	servers = best_answer;
 	answer.clear();
@@ -213,7 +243,6 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 		MCF.getTotalCost(answer, min_use);
 		min_use += 0.01;
 	} while (current_cost != -1);
-	printf("cost = %d\n", all_cost);
 
 //	for (ita = best_answer.begin(); ita != best_answer.end(); ++ita){
 //		cout << "{" << ita->first << "," << ita->second << "}";
