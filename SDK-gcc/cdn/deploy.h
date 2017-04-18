@@ -27,6 +27,7 @@
 
 using namespace std;
 
+
 /* sj
 
 /*
@@ -47,13 +48,17 @@ extern int current_cost;
 extern vector <pair<int,int>> best_answer;
 extern vector <int> DirectNode;
 
-const int NODEMAX = 10005, EDGEMAX = 20000, INF = 0x3f3f3f3f ;
+const int NODEMAX = 10005, EDGEMAX = 50000, INF = 0x3f3f3f3f ;
 
 extern unordered_map<int,pair<int,int>> Level;
 extern int positionPrice[NODEMAX + 10];
 
 extern bool push_better;
 extern bool pushable;
+
+extern int nodesOutFlow[NODEMAX + 10];
+extern vector <int> ReplaceNodes;
+
 
 //edge 的定义
 struct Edge{
@@ -121,17 +126,13 @@ struct MCMF{
         memset(G, 0, sizeof(G));
 
         needSum = 0;
-        // 之所以初始为1是为了后面的奇偶
         edgeorder = 1;
-        // 读取节点数量
         sscanf(topo[pos],"%d %d %d",&nodeNumber,&edgeNumber,&consumerNumber);
 
 
-        // 源点汇点初始
         vSink = nodeNumber + 1;
         vSource = nodeNumber;
 
-        //部署费用需要修改
         int level = 0,bandwidth = 0,price = 0;
         for(pos = 2; pos < 12; ++pos){
             if(topo[pos][0] == '\n' || topo[pos][0] == '\r' || topo[pos][0] == '\0') {
@@ -145,18 +146,19 @@ struct MCMF{
 
         pos++;
 
-        //地点费用
         int postion;
         for (int i = 0; i < nodeNumber; ++i) {
             sscanf(topo[i + pos], "%d%d", &postion, &price);
             positionPrice[postion] = price;
+
         }
         pos += nodeNumber +1;
 
         for (int i = 0; i < edgeNumber; ++i) {
             int _from,_to,_flow,_cost;
             sscanf(topo[i + pos],"%d %d %d %d",&_from,&_to,&_flow,&_cost);
-
+            nodesOutFlow[_from] += _flow;
+            nodesOutFlow[_to] += _flow;
             addEdge(_from,_to,_flow,_cost);
             addEdge(_to,_from,_flow,_cost);
 
@@ -170,10 +172,21 @@ struct MCMF{
             if(d){
                 DirectNode.push_back(netnode);
             }
+            nodesOutFlow[netnode] += need;
             addEdge(netnode,vSink,need,0);
             needSum += need;
             Net2Consumer[netnode] = consumer;
         }
+
+        vector<pair <int,int>> rankNodes;
+        for(int i = 0; i < nodeNumber; ++i){
+            rankNodes.push_back(make_pair(nodesOutFlow[i],i));
+        }
+        sort(rankNodes.begin(),rankNodes.end());
+        for(int i = 0; i < nodeNumber; ++i){
+            ReplaceNodes.push_back(rankNodes[i].second);
+        }
+        reverse(ReplaceNodes.begin(),ReplaceNodes.end());
     }
 
 
@@ -460,6 +473,7 @@ struct MCMF{
         auto beforeResult = solve();
         if(!isFeasibleFlow()){
             current_cost = -1;
+//            cout << "fail" << endl;
             return false;
         }
         int beforeTotalCost = 0;

@@ -21,6 +21,9 @@ int positionPrice[NODEMAX + 10];
 bool push_better;
 bool pushable;
 
+int nodesOutFlow[NODEMAX + 10];
+vector <int> ReplaceNodes;
+
 MCMF MCF;
 
 //返回当前经过的时间
@@ -58,6 +61,12 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	return_time();
 	MCF.clear();
 	MCF.buildGraph(topo);
+
+	int time_max;
+//	if (MCF.nodeNumber < 1000)
+		time_max = 87;
+//	else
+//		time_max = 80;
 
 	MCF.getTotalCost(DirectNode, 0);
 	printf("direct cost is %d \n", all_cost);
@@ -164,6 +173,36 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			++ita;
 	}
 
+
+	servers = best_answer;
+	answer.clear();
+	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
+		answer.push_back(it->first);
+	}
+	vector<int> answer1;
+	vector<int>::iterator itc2;
+	vector<int> good;
+	good = ReplaceNodes;
+	for (itc = good.begin(); itc != good.end(); ++itc){
+		if (return_time() > time_max)
+			break;
+		if (find(answer.begin(),answer.end(),*itc) == answer.end()){
+			answer.push_back(*itc);
+			for (itc2 = answer.begin(); itc2 != answer.end()-1; ){
+				if (return_time() > time_max)
+					break;
+				answer1 = answer;
+				answer1.erase(answer1.begin() + (itc2 - answer.begin()));
+				if (MCF.getTotalCost(answer1,0)){
+					answer = answer1;
+					continue;
+				}
+				++itc2;
+			}
+		}
+	}
+
+
 	servers = best_answer;
 	answer.clear();
 	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
@@ -175,6 +214,11 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 		min_use += 0.01;
 	} while (current_cost != -1);
 	printf("cost = %d\n", all_cost);
+
+//	for (ita = best_answer.begin(); ita != best_answer.end(); ++ita){
+//		cout << "{" << ita->first << "," << ita->second << "}";
+//	}
+//	cout << endl;
 
 	MCF.printAllPath();
 	sprintf(temp, "%d\n\n", MCF.flowCnt);
