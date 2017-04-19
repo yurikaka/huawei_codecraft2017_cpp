@@ -8,7 +8,7 @@ char temp[550000];
 int all_cost = INT32_MAX;
 int current_cost;
 
-int min_node_cost = INT32_MAX;
+int num_level;
 
 vector <pair<int,int>> best_answer;
 vector <int> DirectNode;
@@ -53,6 +53,10 @@ bool cmp(pair<int, int> p, pair<int, int> q) {
 	return p.second < q.second;
 }
 
+bool cmp2(pair<int, int> p, pair<int, int> q) {
+	return p.second > q.second;
+}
+
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 {
@@ -63,13 +67,14 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	MCF.buildGraph(topo);
 
     //todo change time limit
-	int time_max[4] = {5,40,44,87};
+	int time_max[4] = {5, 40, 25, 86};
 
 
 	MCF.getTotalCost(DirectNode, 0);
 	printf("direct cost is %d \n", all_cost);
     cout << endl;
 
+    cout << "begin move1, num of servers = " << best_answer.size() << endl;
     cout << "begin move1 at " << return_time() << " second" << endl;
     cout << "begin move1 at " << all_cost << " cost" << endl;
     cout << endl;
@@ -80,7 +85,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
             break;
 		bool flag = true;
 		int cost_flow = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
-		while (flag && positionPrice[it->first] != min_node_cost) {
+		while (flag && positionPrice[it->first] != Level[0].first) {
 			flag = false;
 			for (int i = MCF.G[it->first]; i; i = MCF.edge[i].next) {
 				if (i % 2 == 1)
@@ -104,6 +109,50 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	}
 	MCF.getTotalCost(answer, 0);
 
+    cout << "begin delete, num of servers = " << best_answer.size() << endl;
+	cout << "begin delete at " << return_time() << " second" << endl;
+	cout << "begin delete at " << all_cost << " cost" << endl;
+	cout << endl;
+
+    bool flag = false;
+	servers = best_answer;
+	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it)
+		it->second = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
+	sort(servers.begin(), servers.end(), cmp2);
+    vector<int> delete_answer;
+	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
+        if (find(delete_answer.begin(), delete_answer.end(), it->first) != delete_answer.end())
+            continue;
+        if (flag) {
+            flag = false;
+            answer.clear();
+            for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
+                if (find(delete_answer.begin(), delete_answer.end(), it->first) == delete_answer.end())
+                    answer.push_back(it->first);
+            }
+//            MCF.getTotalCost(answer, 0);
+//            printf("num of servers = %lu, cost = %d\n", best_answer.size(), all_cost);
+        }
+		for (int i = MCF.G[it->first]; i; i = MCF.edge[i].next) {
+			if (i % 2 == 1)
+				continue;
+			if (MCF.edge[i].to == MCF.vSink || MCF.edge[i].to == MCF.vSource)
+				continue;
+			if (find(answer.begin(), answer.end(), MCF.edge[i].to) == answer.end())
+				continue;
+			int cost_flow = MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow;
+			if (MCF.edge[i].flow + MCF.edge[i ^ 1].flow >= cost_flow) {
+                if (MCF.edge[MCF.server2edge[it->first] ^ 1].flow + MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow  <= Level[num_level - 1].first) {
+                    MCF.edge[MCF.server2edge[it->first] ^ 1].flow += MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow;
+                    delete_answer.push_back(MCF.edge[i].to);
+                    flag = true;
+                }
+			}
+		}
+	}
+    MCF.getTotalCost(answer, 0);
+
+    cout << "begin delete, num of servers = " << best_answer.size() << endl;
     cout << "begin delete at " << return_time() << " second" << endl;
     cout << "begin delete at " << all_cost << " cost" << endl;
     cout << endl;
@@ -116,6 +165,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
         if (return_time() > time_max[1])
             break;
 		servers = best_answer;
+        for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it)
+            it->second = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
 		sort(servers.begin(), servers.end(), cmp);
 		tmp_back = servers.back();
 		while (servers.front() != tmp_back) {
@@ -145,12 +196,12 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			} else {
 				servers.push_back(tmp_first);
 			}
-			//printf("num of servers = %lu, cost = %d\n", answer.size(), all_cost);
+			//printf("num of servers = %lu, cost = %d\n", best_answer.size(), all_cost);
 		}
 		--num_sround_min;
 	}
 
-
+    cout << "begin move2, num of servers = " << best_answer.size() << endl;
     cout << "begin move2 at " << return_time() << " second" << endl;
     cout << "begin move2 at " << all_cost << " cost" << endl;
     cout << endl;
@@ -170,7 +221,6 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	for (ita = servers.begin(); ita != servers.end();){
         if (return_time() > time_max[2])
             break;
-//        cout << ita - answer.begin() << endl;
 		cheaper.clear();
 		old = ita->first;
 		current_edge = MCF.G[old];
@@ -198,6 +248,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			++ita;
 	}
 
+	cout << "begin add delete, num of servers = " << best_answer.size() << endl;
     cout << "begin add delete at " << return_time() << " second" << endl;
     cout << "begin add delete at " << all_cost << " cost" << endl;
     cout << endl;
@@ -229,6 +280,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 			}
 		}
 	}
+
+    printf("begin push, num of servers = %lu\n", best_answer.size());
     cout << "begin push at " << return_time() << " second" << endl;
     cout << "begin push at " << all_cost << " cost" << endl;
     cout << endl;
@@ -249,6 +302,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 //	}
 //	cout << endl;
 
+	MCF.getTotalCost(best_answer);
 	MCF.printAllPath();
 	sprintf(temp, "%d\n\n", MCF.flowCnt);
 	strcat(temp, out);
@@ -257,7 +311,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	char * topo_file = (char *) temp;
 
 #ifdef PRINT_COST
-    printf("server num = %d\n",best_answer.size());
+    printf("server num = %lu\n",best_answer.size());
 	printf("all cost = %d\n",all_cost);
 #endif
 	// 直接调用输出文件的方法输出到指定文件中(ps请注意格式的正确性，如果有解，第一行只有一个数据；第二行为空；第三行开始才是具体的数据，数据之间用一个空格分隔开)

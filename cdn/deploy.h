@@ -45,6 +45,9 @@ extern char temp[550000];
 extern int all_cost;
 extern int current_cost;
 
+extern int num_level;
+
+
 extern vector <pair<int,int>> best_answer;
 extern vector <int> DirectNode;
 
@@ -143,7 +146,7 @@ struct MCMF{
             Level[pos-2].first = bandwidth;
             Level[pos-2].second = price;
         }
-
+        num_level = pos - 2;
         pos++;
 
         int postion;
