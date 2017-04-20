@@ -24,6 +24,8 @@ bool pushable;
 int nodesOutFlow[NODEMAX + 10];
 vector <int> ReplaceNodes;
 
+int out_degree[1500] = {0};
+
 MCMF MCF;
 
 //返回当前经过的时间
@@ -55,6 +57,14 @@ bool cmp(pair<int, int> p, pair<int, int> q) {
 
 bool cmp2(pair<int, int> p, pair<int, int> q) {
 	return p.second > q.second;
+}
+
+bool cmp_out_down(int p, int q){
+    return out_degree[p] > out_degree[q];
+}
+
+bool cmp_out_up(int p, int q){
+    return out_degree[p] < out_degree[q];
 }
 
 //你要完成的功能总入口
@@ -258,10 +268,14 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
 		answer.push_back(it->first);
 	}
+    sort(answer.begin(),answer.end(),cmp_out_up);
 	vector<int> answer1;
 	vector<int>::iterator itc2;
 	vector<int> good;
 	good = ReplaceNodes;
+    sort(good.begin(),good.end(),cmp_out_down);
+    cout << *good.begin() <<","<< *(good.begin()+1) <<","<< out_degree[*good.begin()] <<","<< out_degree[*(good.begin()+1)] << endl;
+    cout << good.size() << endl;
 	for (itc = good.begin(); itc != good.end(); ++itc){
 		if (return_time() > time_max[3])
 			break;

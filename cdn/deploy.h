@@ -62,6 +62,8 @@ extern bool pushable;
 extern int nodesOutFlow[NODEMAX + 10];
 extern vector <int> ReplaceNodes;
 
+extern int out_degree[1500];
+
 
 //edge 的定义
 struct Edge{
@@ -117,7 +119,7 @@ struct MCMF{
         G[from] = edgeorder;
         edge[++edgeorder] = Edge(from,0,-cost,G[to]);
         G[to] = edgeorder;
-
+        ++out_degree[from];
     }
 
 
