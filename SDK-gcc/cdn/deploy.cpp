@@ -24,7 +24,18 @@ bool pushable;
 int nodesOutFlow[NODEMAX + 10];
 vector <int> ReplaceNodes;
 
-int out_degree[1500] = {0};
+int out_degree[NODEMAX] = {0};//出度
+int out_flow[NODEMAX] = {0};//出边流量
+int node_actual_flow[NODEMAX] = {0};//todo 每次跑solve的时候统计，每次跑完后统计策略后需要清除
+int total_lost_flow = 0;//总的确实费用
+unordered_map<int,int>consumer_lost_flow;//每个消费节点的缺失费用
+unordered_map<int,int>consumer_needed_flow;//每个消费节点的需求
+int node_selected_cnt[NODEMAX];//todo 每个点被选择的次数
+int node_level[NODEMAX];//每个消费节点的level
+
+int node_average_chain_cost[NODEMAX];//加权平均 建图的时候求一次 为价值做辅助
+int node_cost[NODEMAX];//包含地价以及链路成本
+unordered_map <int,vector<pair<int,int>>> group;
 
 MCMF MCF;
 
@@ -51,272 +62,114 @@ int return_time()
 	return out_s;
 }
 
-bool cmp(pair<int, int> p, pair<int, int> q) {
-	return p.second < q.second;
+bool cmp_actual_flow(int p, int q){
+    return node_actual_flow[p] > node_actual_flow[q];
 }
 
-bool cmp2(pair<int, int> p, pair<int, int> q) {
-	return p.second > q.second;
+bool cmp_actual_flow_up(int p, int q){
+    return node_actual_flow[p] < node_actual_flow[q];
 }
 
-bool cmp_out_down(int p, int q){
-    return out_degree[p] > out_degree[q];
+bool cmp_out_degeree(int p, int q){
+	return out_degree[p] > out_degree[q];
 }
 
-bool cmp_out_up(int p, int q){
-    return out_degree[p] < out_degree[q];
+bool cmp_out_flow(int p, int q){
+	return out_flow[p] > out_flow[q];
+}
+
+bool cmp_lost_flow(int p, int q){
+    return consumer_lost_flow[p] > consumer_lost_flow[q];
 }
 
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 {
 	vector<pair<int, int>> servers;
-	vector<int> answer;
+	vector<int> current_answer,rest,all_node;
+    int i,last_queshi=0;
 	return_time();
 	MCF.clear();
 	MCF.buildGraph(topo);
 
-    //todo change time limit
-	int time_max[4] = {5, 40, 25, 86};
+    current_answer.clear();
+    vector<int>::iterator itm;
 
-
-	MCF.getTotalCost(DirectNode, 0);
-	printf("direct cost is %d \n", all_cost);
-    cout << endl;
-
-    cout << "begin move1, num of servers = " << best_answer.size() << endl;
-    cout << "begin move1 at " << return_time() << " second" << endl;
-    cout << "begin move1 at " << all_cost << " cost" << endl;
-    cout << endl;
-
-	servers = best_answer;
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-        if (return_time() > time_max[0])
-            break;
-		bool flag = true;
-		int cost_flow = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
-		while (flag && positionPrice[it->first] != Level[0].first) {
-			flag = false;
-			for (int i = MCF.G[it->first]; i; i = MCF.edge[i].next) {
-				if (i % 2 == 1)
-					continue;
-				if (MCF.edge[i].to == MCF.vSink || MCF.edge[i].to == MCF.vSource)
-					continue;
-				if (MCF.edge[i].flow + MCF.edge[i ^ 1].flow >= cost_flow) {
-					if (MCF.edge[i].cost * cost_flow <= positionPrice[it->first] - positionPrice[MCF.edge[i].to]) {
-						*it = pair<int, int>(MCF.edge[i].to, it->second);
-						flag = true;
-						break;
-					}
-				}
-			}
-		}
+	all_node.clear();
+	for (i = 0; i < MCF.nodeNumber; ++i){
+		all_node.push_back(i);
 	}
-	answer.clear();
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-		if (find(answer.begin(), answer.end(), it->first) == answer.end())
-			answer.push_back(it->first);
-	}
-	MCF.getTotalCost(answer, 0);
 
-    cout << "begin delete, num of servers = " << best_answer.size() << endl;
-	cout << "begin delete at " << return_time() << " second" << endl;
-	cout << "begin delete at " << all_cost << " cost" << endl;
-	cout << endl;
+    int jiaoji = 50;
+    if (MCF.nodeNumber < 1000)
+        jiaoji = 29;
 
-    bool flag = false;
-	servers = best_answer;
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it)
-		it->second = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
-	sort(servers.begin(), servers.end(), cmp2);
-    vector<int> delete_answer;
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-        if (find(delete_answer.begin(), delete_answer.end(), it->first) != delete_answer.end())
-            continue;
-        if (flag) {
-            flag = false;
-            answer.clear();
-            for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-                if (find(delete_answer.begin(), delete_answer.end(), it->first) == delete_answer.end())
-                    answer.push_back(it->first);
-            }
-//            MCF.getTotalCost(answer, 0);
-//            printf("num of servers = %lu, cost = %d\n", best_answer.size(), all_cost);
-        }
-		for (int i = MCF.G[it->first]; i; i = MCF.edge[i].next) {
-			if (i % 2 == 1)
-				continue;
-			if (MCF.edge[i].to == MCF.vSink || MCF.edge[i].to == MCF.vSource)
-				continue;
-			if (find(answer.begin(), answer.end(), MCF.edge[i].to) == answer.end())
-				continue;
-			int cost_flow = MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow;
-			if (MCF.edge[i].flow + MCF.edge[i ^ 1].flow >= cost_flow) {
-                if (MCF.edge[MCF.server2edge[it->first] ^ 1].flow + MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow  <= Level[num_level - 1].first) {
-                    MCF.edge[MCF.server2edge[it->first] ^ 1].flow += MCF.edge[MCF.server2edge[MCF.edge[i].to] ^ 1].flow;
-                    delete_answer.push_back(MCF.edge[i].to);
-                    flag = true;
-                }
-			}
-		}
-	}
-    MCF.getTotalCost(answer, 0);
+	sort(all_node.begin(),all_node.end(),cmp_out_degeree);
+	vector<int> more1(all_node.begin(),all_node.begin()+jiaoji);
+    cout << *(more1.begin()) <<","<< out_degree[*(more1.begin())] << "," << *(more1.begin()+1) <<","<< out_degree[*(more1.begin()+1)] << endl;
+	sort(all_node.begin(),all_node.end(),cmp_out_flow);
+	vector<int> more2(all_node.begin(),all_node.begin()+jiaoji);
 
-    cout << "begin delete, num of servers = " << best_answer.size() << endl;
-    cout << "begin delete at " << return_time() << " second" << endl;
-    cout << "begin delete at " << all_cost << " cost" << endl;
-    cout << endl;
+    for (itm = more1.begin(); itm != more1.end(); ++itm){
+        if (find(more2.begin(),more2.end(),*itm) != more2.end())
+            current_answer.push_back(*itm);
+    }
+    MCF.getTotalCost(current_answer,0);
 
-	int num_sround_min = 5;
-	int num_sround;
-	pair<int, int> tmp_first;
-	pair<int, int> tmp_back;
-	while (num_sround_min >= 1) {
-        if (return_time() > time_max[1])
-            break;
-		servers = best_answer;
-        for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it)
-            it->second = MCF.edge[MCF.server2edge[it->first] ^ 1].flow;
-		sort(servers.begin(), servers.end(), cmp);
-		tmp_back = servers.back();
-		while (servers.front() != tmp_back) {
-            if (return_time() > time_max[1])
-                break;
-			tmp_first = servers.front();
-			servers.erase(servers.begin());
-			answer.clear();
-			for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-				answer.push_back(it->first);
-			}
-			num_sround = 0;
-			for (int i = MCF.G[tmp_first.first]; i; i = MCF.edge[i].next) {
-                if (return_time() > time_max[1])
+    cout << current_answer.size() << endl;
+    cout << "also need " << total_lost_flow << " of " << MCF.needSum << endl << endl;
+
+    unordered_map<int,int>::iterator itc;
+    vector<int> lost_direct;
+//    for (itc = consumer_lost_flow.begin(); itc != consumer_lost_flow.end(); ++itc){
+//        if (itc->second != 0)
+//            lost_direct.push_back(itc->first);
+//    }
+//    i = 0;
+//    for (itm = lost_direct.begin(); itm != lost_direct.end(); ++itm){
+//        current_answer.push_back(*itm);
+//        ++i;
+////            cout << itc->first << "," << i++ << endl;
+//        if (i % 2 == 0) {
+//            MCF.getTotalCost(current_answer, 0);
+//            if (total_lost_flow <= 0)
+//                break;
+//        }
+//    }
+    i = 0;
+    for (itc = consumer_lost_flow.begin(); itc != consumer_lost_flow.end(); ++itc){
+        if (itc->second != 0) {
+            current_answer.push_back(itc->first);
+            ++i;
+//            cout << itc->first << "," << i++ << endl;
+            if (i % 2 == 0) {
+                MCF.getTotalCost(current_answer, 0);
+                if (total_lost_flow <= 0)
                     break;
-				if (i % 2 == 1)
-					continue;
-				if (MCF.edge[i].to == MCF.vSink || MCF.edge[i].to == MCF.vSource)
-					continue;
-				if (find(answer.begin(), answer.end(), MCF.edge[i].to) != answer.end())
-					++num_sround;
-			}
-			if (num_sround >= num_sround_min) {
-				MCF.getTotalCost(answer, 0);
-				if (current_cost == -1)
-					servers.push_back(tmp_first);
-			} else {
-				servers.push_back(tmp_first);
-			}
-			//printf("num of servers = %lu, cost = %d\n", best_answer.size(), all_cost);
-		}
-		--num_sround_min;
-	}
+            }
+        }
+    }
 
-    cout << "begin move2, num of servers = " << best_answer.size() << endl;
-    cout << "begin move2 at " << return_time() << " second" << endl;
-    cout << "begin move2 at " << all_cost << " cost" << endl;
-    cout << endl;
 
-	vector<int> cheaper;
-	vector<int>::iterator itc;
-
-	vector<pair<int,int>>::iterator ita;
-	servers= best_answer;
-	int old;
-	int current_edge;
-	answer.clear();
-	for (ita = servers.begin(); ita != servers.end(); ++ita){
-		answer.push_back(ita->first);
-	}
-
-	for (ita = servers.begin(); ita != servers.end();){
-        if (return_time() > time_max[2])
-            break;
-		cheaper.clear();
-		old = ita->first;
-		current_edge = MCF.G[old];
-		while (current_edge){
-            if (return_time() > time_max[2])
-                break;
-			if (current_edge %2 == 1 || MCF.edge[current_edge].to == MCF.vSource ||MCF.edge[current_edge].to == MCF.vSink){
-				current_edge = MCF.edge[current_edge].next;
-				continue;
-			}
-			if (positionPrice[MCF.edge[current_edge].to] < positionPrice[old])
-				if (find(answer.begin(),answer.end(),MCF.edge[current_edge].to) == answer.end())
-					cheaper.push_back(MCF.edge[current_edge].to);
-			current_edge = MCF.edge[current_edge].next;
-		}
-		for (itc = cheaper.begin(); itc != cheaper.end(); ++itc){
-            if (return_time() > time_max[2])
-                break;
-			ita->first = *itc;
-			MCF.getTotalCost(servers);
-		}
-		servers = best_answer;
-		*(answer.begin() + (ita - servers.begin())) = ita->first;
-		if (ita->first == old)
-			++ita;
-	}
-
-	cout << "begin add delete, num of servers = " << best_answer.size() << endl;
-    cout << "begin add delete at " << return_time() << " second" << endl;
-    cout << "begin add delete at " << all_cost << " cost" << endl;
-    cout << endl;
-
-	servers = best_answer;
-	answer.clear();
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-		answer.push_back(it->first);
-	}
-    sort(answer.begin(),answer.end(),cmp_out_up);
-	vector<int> answer1;
-	vector<int>::iterator itc2;
-	vector<int> good;
-	good = ReplaceNodes;
-    sort(good.begin(),good.end(),cmp_out_down);
-    cout << *good.begin() <<","<< *(good.begin()+1) <<","<< out_degree[*good.begin()] <<","<< out_degree[*(good.begin()+1)] << endl;
-    cout << good.size() << endl;
-	for (itc = good.begin(); itc != good.end(); ++itc){
-		if (return_time() > time_max[3])
-			break;
-		if (find(answer.begin(),answer.end(),*itc) == answer.end()){
-			answer.push_back(*itc);
-			for (itc2 = answer.begin(); itc2 != answer.end()-1; ){
-				if (return_time() > time_max[3])
-					break;
-				answer1 = answer;
-				answer1.erase(answer1.begin() + (itc2 - answer.begin()));
-				if (MCF.getTotalCost(answer1,0)){
-					answer = answer1;
-					continue;
-				}
-				++itc2;
-			}
-		}
-	}
-
-    printf("begin push, num of servers = %lu\n", best_answer.size());
-    cout << "begin push at " << return_time() << " second" << endl;
-    cout << "begin push at " << all_cost << " cost" << endl;
-    cout << endl;
-
-	servers = best_answer;
-	answer.clear();
-	for (vector<pair<int, int>>::iterator it = servers.begin(); it != servers.end(); ++it) {
-		answer.push_back(it->first);
-	}
-	double min_use = 0.00;
-	do {
-		MCF.getTotalCost(answer, min_use);
-		min_use += 0.01;
-	} while (current_cost != -1);
-
-//	for (ita = best_answer.begin(); ita != best_answer.end(); ++ita){
-//		cout << "{" << ita->first << "," << ita->second << "}";
+//    rest = all_node;
+//	for (itm = current_answer.begin(); itm != current_answer.end(); ++itm){
+//		rest.erase(find(rest.begin(),rest.end(),*itm));
 //	}
-//	cout << endl;
+//    sort(rest.begin(),rest.end(),cmp_actual_flow_up);
 
-	MCF.getTotalCost(best_answer);
+
+
+
+
+
+
+	MCF.getTotalCost(current_answer,0);
+
+
+
+
+
+    //最后一遍调用用来输出流的
 	MCF.printAllPath();
 	sprintf(temp, "%d\n\n", MCF.flowCnt);
 	strcat(temp, out);
@@ -325,7 +178,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	char * topo_file = (char *) temp;
 
 #ifdef PRINT_COST
-    printf("server num = %lu\n",best_answer.size());
+    printf("server num = %lld\n",best_answer.size());
 	printf("all cost = %d\n",all_cost);
 #endif
 	// 直接调用输出文件的方法输出到指定文件中(ps请注意格式的正确性，如果有解，第一行只有一个数据；第二行为空；第三行开始才是具体的数据，数据之间用一个空格分隔开)

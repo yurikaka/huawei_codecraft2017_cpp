@@ -51,7 +51,7 @@ extern int num_level;
 extern vector <pair<int,int>> best_answer;
 extern vector <int> DirectNode;
 
-const int NODEMAX = 10005, EDGEMAX = 50000, INF = 0x3f3f3f3f ;
+const int NODEMAX = 1500, EDGEMAX = 50000, INF = 0x3f3f3f3f ;
 
 extern unordered_map<int,pair<int,int>> Level;
 extern int positionPrice[NODEMAX + 10];
@@ -62,7 +62,27 @@ extern bool pushable;
 extern int nodesOutFlow[NODEMAX + 10];
 extern vector <int> ReplaceNodes;
 
-extern int out_degree[1500];
+
+//新版本逻辑
+/**************************新加变量****************************/
+extern int out_degree[NODEMAX];//出度
+extern int out_flow[NODEMAX];//出边流量
+
+extern int node_actual_flow[NODEMAX];//todo 每次跑完后统计策略后需要清除
+extern int total_lost_flow;//总的缺失费用
+extern unordered_map<int,int>consumer_lost_flow;//每个消费节点的缺失费用
+extern unordered_map<int,int>consumer_needed_flow;//每个消费节点的需求
+
+extern int node_selected_cnt[NODEMAX];//todo 每个点被选择的次数
+extern int node_level[NODEMAX];//每个消费节点的level
+
+/**************************动态规划分组背包****************************/
+//todo 动态规划分组背包  很关键的近似解
+//有多少个点就有多少个组，bandwidth是容量(即总需求)，cost是价格，每组等级个点
+//先统计  每个点的价值 buildGraph 时统计 价值包括链路成本(链路成本用加权平均)
+extern int node_average_chain_cost[NODEMAX];//加权平均 建图的时候求一次 为价值做辅助
+extern int node_cost[NODEMAX];//包含地价以及链路成本
+extern unordered_map <int,vector<pair<int,int>>> group;
 
 
 //edge 的定义
@@ -91,10 +111,7 @@ struct MCMF{
     int solveTimes = 0; // 记录一共调用了求解多少次
     int maxBandWidth;
     int levelNum = 0;
-//  todo 这里分几个等级
-    int deployCost;
-//  todo 每个节点也需要部署费用
-    ;
+
 
 
 
@@ -120,6 +137,7 @@ struct MCMF{
         edge[++edgeorder] = Edge(from,0,-cost,G[to]);
         G[to] = edgeorder;
         ++out_degree[from];
+        out_flow[from] += capacity;
     }
 
 
@@ -127,8 +145,12 @@ struct MCMF{
 /*+++++++++++++++建图only once++++++++++++++++++*/
 
     void buildGraph(char *topo[EDGEMAX]){
+
         int pos = 0;
+
+
         memset(G, 0, sizeof(G));
+        memset(node_level,-1,sizeof(node_level));
 
         needSum = 0;
         edgeorder = 1;
@@ -137,6 +159,10 @@ struct MCMF{
 
         vSink = nodeNumber + 1;
         vSource = nodeNumber;
+
+        for(int i = 0; i < nodeNumber; ++i){
+            group[i] = {};
+        }
 
         int level = 0,bandwidth = 0,price = 0;
         for(pos = 2; pos < 13; ++pos){
@@ -162,6 +188,7 @@ struct MCMF{
         for (int i = 0; i < edgeNumber; ++i) {
             int _from,_to,_flow,_cost;
             sscanf(topo[i + pos],"%d %d %d %d",&_from,&_to,&_flow,&_cost);
+
             nodesOutFlow[_from] += _flow;
             nodesOutFlow[_to] += _flow;
             addEdge(_from,_to,_flow,_cost);
@@ -179,6 +206,10 @@ struct MCMF{
             }
             nodesOutFlow[netnode] += need;
             addEdge(netnode,vSink,need,0);
+            // 每个消费节点的需求
+            consumer_needed_flow[netnode] += need;
+            consumer_lost_flow[netnode] = 0;
+
             needSum += need;
             Net2Consumer[netnode] = consumer;
         }
@@ -192,7 +223,57 @@ struct MCMF{
             ReplaceNodes.push_back(rankNodes[i].second);
         }
         reverse(ReplaceNodes.begin(),ReplaceNodes.end());
+
     }
+
+    void DPForAnswer(){
+//    求node_average_chain_cost 每个点的链路平均成本
+        for (int node = 0; node < nodeNumber; ++node) {
+            for(int i = G[node]; i ;i = edge[i].next){
+                if(i&1) continue;
+                int flow = edge[i].flow;
+                int cost = edge[i].cost;
+                node_average_chain_cost[node] +=(flow/nodesOutFlow[node])*cost;
+            }
+        }
+//        初始化group
+        for(int node = 0; node < nodeNumber; ++node){
+            for(int level = 0; level < num_level; ++level){
+                int bandwidth = min(Level[level].first,nodesOutFlow[node]);
+//                模拟实际情况求得cost
+                int cost = Level[level].second + positionPrice[node] + bandwidth * node_average_chain_cost[node];
+                group[node].push_back(make_pair(bandwidth,cost));
+            }
+        }
+        cout << "fuck" << endl;
+        int **dp = new int*[nodeNumber + 1];
+        for (int i = 0; i < nodeNumber + 1; ++i)
+            dp[i] = new int[needSum + 1];
+        cout << "fuck" << endl;
+
+        memset(dp[0],0x3f, sizeof(dp[0]));
+        dp[0][0] = 0;
+        for(int i = 0; i < nodeNumber; ++i){
+            for(int need = 0; need <= needSum; ++need){
+                dp[i+1][need] = dp[i][need];
+            }
+
+            for(int need = 0; need <= needSum; ++need){
+                for(int k = 0; k < group[i].size(); ++k){
+                    int tmpNeed = min(need+group[i][k].first,needSum);
+                    if(dp[i+1][tmpNeed] > dp[i][need] + group[i][k].second){
+                        cout << "i'm in" << endl;
+
+                        dp[i+1][tmpNeed] = dp[i][need] + group[i][k].second;
+                        cout << dp[i+1][tmpNeed] << endl;
+                    }
+                }
+            }
+
+        }
+        cout <<dp[nodeNumber+1][needSum] << endl;
+    }
+
 
 
 /*+++++++++++++++建超级源点++++++++++++++++++*/
@@ -240,6 +321,8 @@ struct MCMF{
         memset(inQueue,0,sizeof(inQueue));
         memset(preV,0,sizeof(preV));
         memset(preE,0,sizeof(preE));
+        memset(node_actual_flow,0,sizeof(node_actual_flow));
+        memset(node_level,0,sizeof(node_level));
 
         //memset(edge,0,sizeof(edge));
         //todo 所有边置为读进来的情况，注意有没有需要特殊处理的情况，比如汇点和源点
@@ -358,9 +441,11 @@ struct MCMF{
 
 /*+++++++++++++++判断是否是可行流++++++++++++++++++*/
     bool isFeasibleFlow(){
-
         return needSum == currentFlows;
     }
+
+
+
 
 /*+++++++++++++++求解可行流++++++++++++++++++*/
     int solve(){
@@ -370,7 +455,28 @@ struct MCMF{
             cur += augment();
             if(cur > ans) ans = cur;
         }
+        statistic();
         return ans;
+    }
+
+/*+++++++++++++++统计所有信息++++++++++++++++++*/
+
+    void statistic(){
+        //总的缺失信息
+        total_lost_flow = needSum - currentFlows;
+
+        for(int i = 3; i <= edgeorder; i += 2){
+
+            int v = edge[edgeorder].to;
+            int flow = edge[edgeorder].flow;
+            //每个点的实际流量
+            node_actual_flow[v] += flow;
+        }
+        for(int i = G[vSink]; i; i = edge[i].next){
+            if(i&1){
+                consumer_lost_flow[edge[i].to] = edge[i^1].flow;
+            }
+        }
     }
 
 /*+++++++++++++++打印一条路径++++++++++++++++++*/
