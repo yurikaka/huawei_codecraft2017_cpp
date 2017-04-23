@@ -366,59 +366,59 @@ vector<pair<int,int>> deleteLowEffiecientServers(vector<pair<int,int>> servers){
 };
 
 //缺失流量的服务器
-vector<int> bfs(vector<int> servers,vector<int> consumers){
-    unordered_map<int,set<int>> consumerMap;
-
-    set<int> mySet(consumers.begin(),consumers.end());
-    for(auto c : consumers){
-        consumerMap[c] = {};
-    }
-    set<int> visited;
-
-    for (auto server: servers){
-        queue<int> Q;
-        Q.push(server);
-        while(!Q.empty()){
-            int tmpv = Q.front();
-            Q.pop();
-            if(visited.count(tmpv))continue;
-            visited.insert(tmpv);
-            for(int i = MCF.G[tmpv]; i ; i = MCF.edge[i].next){
-                if (i & 1) continue;
-                if (MCF.edge[i].flow == 0) continue;
-                if (MCF.edge[i^1].flow == 0)continue;
-                int node = MCF.edge[i].to;
-                if(mySet.count(node))consumerMap[node].insert(server);
-                Q.push(node);
-            }
-        }
-        visited.clear();
-    }
-    unordered_map<int,int> tmpmap;
-    for(auto c : consumers){
-//        cout << "cousumer  " << c << ": servers";
-        for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
-//            cout << " " << *it << " ";
-            if(tmpmap.count(*it)){
-                tmpmap[*it] += 1;
-            }else{
-                tmpmap[*it] = 1;
-            }
-        }
-//        cout << endl;
-    }
-    vpii res;
-    for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
-        res.push_back(make_pair(it->second,it->first));
-    }
-    sort(res.begin(),res.end());
-    reverse(res.begin(),res.end());
-    vector<int> resv;
-    for(auto it = res.begin(); it != res.end(); ++it){
-        resv.push_back(it->second);
-    }
-    return resv;
-}
+//vector<int> bfs(vector<int> servers,vector<int> consumers){
+//    unordered_map<int,set<int>> consumerMap;
+//
+//    set<int> mySet(consumers.begin(),consumers.end());
+//    for(auto c : consumers){
+//        consumerMap[c] = {};
+//    }
+//    set<int> visited;
+//
+//    for (auto server: servers){
+//        queue<int> Q;
+//        Q.push(server);
+//        while(!Q.empty()){
+//            int tmpv = Q.front();
+//            Q.pop();
+//            if(visited.count(tmpv))continue;
+//            visited.insert(tmpv);
+//            for(int i = MCF.G[tmpv]; i ; i = MCF.edge[i].next){
+//                if (i & 1) continue;
+//                if (MCF.edge[i].flow == 0) continue;
+//                if (MCF.edge[i^1].flow == 0)continue;
+//                int node = MCF.edge[i].to;
+//                if(mySet.count(node))consumerMap[node].insert(server);
+//                Q.push(node);
+//            }
+//        }
+//        visited.clear();
+//    }
+//    unordered_map<int,int> tmpmap;
+//    for(auto c : consumers){
+////        cout << "cousumer  " << c << ": servers";
+//        for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
+////            cout << " " << *it << " ";
+//            if(tmpmap.count(*it)){
+//                tmpmap[*it] += 1;
+//            }else{
+//                tmpmap[*it] = 1;
+//            }
+//        }
+////        cout << endl;
+//    }
+//    vpii res;
+//    for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
+//        res.push_back(make_pair(it->second,it->first));
+//    }
+//    sort(res.begin(),res.end());
+//    reverse(res.begin(),res.end());
+//    vector<int> resv;
+//    for(auto it = res.begin(); it != res.end(); ++it){
+//        resv.push_back(it->second);
+//    }
+//    return resv;
+//}
 
 int getLevel(int flow){
     if(flow == 0){
@@ -495,6 +495,93 @@ vector<pair<int,int>> addHotPotentialServersFromOutOfConsumer(vector<pair<int,in
 
 };
 
+vector<pair<int,int>> bfs(vector<int> servers,vector<int> consumers){
+    unordered_map<int,set<int>> consumerMap;
+
+    set<int> mySet(consumers.begin(),consumers.end());
+    for(auto c : consumers){
+        consumerMap[c] = {};
+    }
+    set<int> visited;
+
+    for (auto server: servers){
+        queue<int> Q;
+        Q.push(server);
+        while(!Q.empty()){
+            int tmpv = Q.front();
+            Q.pop();
+            if(visited.count(tmpv))continue;
+            visited.insert(tmpv);
+            for(int i = MCF.G[tmpv]; i ; i = MCF.edge[i].next){
+                if (i & 1) continue;
+                if (MCF.edge[i].flow == 0) continue;
+                if (MCF.edge[i^1].flow == 0)continue;
+                int node = MCF.edge[i].to;
+                if(mySet.count(node))consumerMap[node].insert(server);
+                Q.push(node);
+            }
+        }
+        visited.clear();
+    }
+    unordered_map<int,int> tmpmap;
+    for(auto c : consumers){
+        cout << "cousumer  " << c << ": servers";
+        for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
+            cout << " " << *it << " ";
+            if(tmpmap.count(*it)){
+                tmpmap[*it] += 1;
+            }else{
+                tmpmap[*it] = 1;
+            }
+        }
+        cout << endl;
+    }
+    vpii res;
+    for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
+        res.push_back(make_pair(it->second,it->first));
+    }
+    sort(res.begin(),res.end());
+    reverse(res.begin(),res.end());
+    vector<int> resv;
+    for(auto it = res.begin(); it != res.end(); ++it){
+        resv.push_back(it->second);
+    }
+
+//    todo 这里可以做文章
+    vector< int >finalresult;
+    int manzu = total_lost_flow;
+    int tmpflow = 0 ;
+    for(int i = 0 ; i < resv.size(); ++i){
+        if(tmpflow < total_lost_flow){
+            finalresult.push_back(resv[i]);
+            tmpflow += node_actual_flow[resv[i]];
+        }
+    }
+    vpii finalPair;
+    for(int i = 0; i < finalresult.size(); ++i){
+        finalPair.push_back(make_pair(finalresult[i],getLevel(node_actual_flow[finalresult[i]])));
+    }
+    return finalPair;
+}
+
+
+vpii budian(vpii a2,vector<int>tmp_consumer){
+
+    vector<int> serverVector;
+    for(int i = 0; i < a2.size(); ++i){
+        serverVector.push_back(a2[i].first);
+    }
+    vector<int> allVector;
+    for(int i = 0; i < MCF.nodeNumber; ++i){
+        allVector.push_back(i);
+    }
+
+    vector<int> notServer = A_minus_B(allVector,serverVector);
+    notServer = A_minus_B(notServer,tmp_consumer);
+    vpii bfsV = bfs(notServer,tmp_consumer);
+    a2 = combinePairAnswer(a2,bfsV);
+    return a2;
+}
 
 bool cmp_flow_down(int p, int q){
     return node_actual_flow[p] > node_actual_flow[q];
@@ -502,6 +589,12 @@ bool cmp_flow_down(int p, int q){
 
 bool cmp_level_up(pair<int,int> p, pair<int,int> q){
     return p.second < q.second;
+}
+bool cmp_level_up1(pair<int,int> p, pair<int,int> q){
+    if (p.second == q.second)
+        return node_actual_flow[p.first] < node_actual_flow[q.first];
+    else
+        return p.second < q.second;
 }
 
 
@@ -548,20 +641,23 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 //    result_1 = shengjidayu(result_1);
 //    MCF.getTotalCost(result_1);
 
-    sort(result_1.begin(),result_1.end(),cmp_level_up);
+    sort(result_1.begin(),result_1.end(),cmp_level_up1);
     int iter_num = result_1.size();
     vpii::iterator it = result_1.begin();
     while (iter_num--) {
-        if (return_time() > 82)
+        if (return_time() > 87)
             break;
+        it = result_1.begin();
         pair<int, int> now = *it;
         result_1.erase(it);
         int last_cost = all_cost;
         MCF.getTotalCost(result_1);
+        sort(result_1.begin(),result_1.begin()+iter_num,cmp_level_up1);
         if (!MCF.isFeasibleFlow()){
             vector<int> tmp_consumer = notEnoughConsumers();
             a2 = result_1;
-            a2 = addServersFromConsumer(a2,tmp_consumer);
+//            a2 = addServersFromConsumer(a2,tmp_consumer);
+            a2 = budian(a2,tmp_consumer);
             MCF.getTotalCost(a2);
             result_1.push_back(now);
         }
@@ -573,7 +669,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 
     unordered_set<int> nownow;
     vector<int> notin;
-    if (MCF.nodeNumber < 1000){
+    if (return_time() < 87){
         for (auto it3 = best_answer.begin(); it3 != best_answer.end(); ++it3){
             nownow.insert(it3->first);
         }
@@ -582,27 +678,39 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
                 notin.push_back(z);
         }
         sort(notin.begin(),notin.end(),cmp_flow_down);
+//        for (auto it4 = notin.begin(); it4 != notin.end(); it4+=2){
+//            if (return_time() > 82)
+//                break;
+//            if (node_actual_flow[*it4] == 0)
+//                break;
+//            result_1 = best_answer;
+//            result_1.push_back(pair<int,int>(*it4,getLevel(node_actual_flow[*it4])));
+//            if (getLevel(node_actual_flow[*(it4+1)]) != -1)
+//                result_1.push_back(pair<int,int>(*(it4+1),getLevel(node_actual_flow[*(it4+1)])));
         for (auto it4 = notin.begin(); it4 != notin.end(); ++it4){
-            if (return_time() > 82)
+            if (return_time() > 87)
                 break;
             if (node_actual_flow[*it4] == 0)
                 break;
             result_1 = best_answer;
             result_1.push_back(pair<int,int>(*it4,getLevel(node_actual_flow[*it4])));
-            sort(result_1.begin(),result_1.end(),cmp_level_up);
+            sort(result_1.begin(),result_1.end(),cmp_level_up1);
             iter_num = result_1.size();
             it = result_1.begin();
             while (iter_num--) {
-                if (return_time() > 82)
+                if (return_time() > 87)
                     break;
+                it = result_1.begin();
                 pair<int, int> now = *it;
                 result_1.erase(it);
                 int last_cost = all_cost;
                 MCF.getTotalCost(result_1);
+                sort(result_1.begin(),result_1.begin()+iter_num,cmp_level_up1);
                 if (!MCF.isFeasibleFlow()){
                     vector<int> tmp_consumer = notEnoughConsumers();
                     a2 = result_1;
                     a2 = addServersFromConsumer(a2,tmp_consumer);
+//                    a2 = budian(a2,tmp_consumer);
                     MCF.getTotalCost(a2);
                     result_1.push_back(now);
                 }
