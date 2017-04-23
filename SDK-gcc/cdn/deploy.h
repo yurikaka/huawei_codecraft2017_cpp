@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <queue>
+#include <set>
 #include <memory.h>
 #include <unordered_set>
 #include <vector>
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <stdint.h>
+#include <unordered_set>
 
 
 
@@ -51,18 +53,47 @@ extern int num_level;
 extern vector <pair<int,int>> best_answer;
 extern vector <int> DirectNode;
 
-const int NODEMAX = 10005, EDGEMAX = 50000, INF = 0x3f3f3f3f ;
+const int NODEMAX = 1500, EDGEMAX = 50000, INF = 0x3f3f3f3f ;
 
 extern unordered_map<int,pair<int,int>> Level;
 extern int positionPrice[NODEMAX + 10];
 
 extern bool push_better;
 extern bool pushable;
+extern bool better;
 
 extern int nodesOutFlow[NODEMAX + 10];
 extern vector <int> ReplaceNodes;
 
-extern int out_degree[1500];
+
+//新版本逻辑
+/**************************新加变量****************************/
+extern int out_degree[NODEMAX];//出度
+extern int out_flow[NODEMAX];//出边流量
+extern double out_percent[NODEMAX];
+
+
+extern int node_actual_flow[NODEMAX];//todo 每次跑完后统计策略后需要清除
+extern int total_lost_flow;//总的缺失费用
+extern unordered_map<int,int>consumer_lost_flow;//每个消费节点的缺失费用
+extern unordered_map<int,int>consumer_needed_flow;//每个消费节点的需求
+
+extern int node_selected_cnt[NODEMAX];//todo 每个点被选择的次数
+extern int node_level[NODEMAX];//每个消费节点的level
+extern int source_server_flow[NODEMAX];
+
+
+
+extern unordered_set<int>consumerNodes;
+extern unordered_set<int> deletedNodes;//删除过的点不会在加进来
+
+/**************************动态规划分组背包****************************/
+//todo 动态规划分组背包  很关键的近似解
+//有多少个点就有多少个组，bandwidth是容量(即总需求)，cost是价格，每组等级个点
+//先统计  每个点的价值 buildGraph 时统计 价值包括链路成本(链路成本用加权平均)
+extern int node_average_chain_cost[NODEMAX];//加权平均 建图的时候求一次 为价值做辅助
+extern int node_cost[NODEMAX];//包含地价以及链路成本
+extern pair<int,int> group[NODEMAX][12];
 
 
 //edge 的定义
@@ -91,10 +122,7 @@ struct MCMF{
     int solveTimes = 0; // 记录一共调用了求解多少次
     int maxBandWidth;
     int levelNum = 0;
-//  todo 这里分几个等级
-    int deployCost;
-//  todo 每个节点也需要部署费用
-    ;
+
 
 
 
@@ -120,6 +148,7 @@ struct MCMF{
         edge[++edgeorder] = Edge(from,0,-cost,G[to]);
         G[to] = edgeorder;
         ++out_degree[from];
+        out_flow[from] += capacity;
     }
 
 
@@ -127,8 +156,12 @@ struct MCMF{
 /*+++++++++++++++建图only once++++++++++++++++++*/
 
     void buildGraph(char *topo[EDGEMAX]){
+
         int pos = 0;
+
+
         memset(G, 0, sizeof(G));
+        memset(node_level,-1,sizeof(node_level));
 
         needSum = 0;
         edgeorder = 1;
@@ -137,6 +170,7 @@ struct MCMF{
 
         vSink = nodeNumber + 1;
         vSource = nodeNumber;
+
 
         int level = 0,bandwidth = 0,price = 0;
         for(pos = 2; pos < 13; ++pos){
@@ -162,6 +196,7 @@ struct MCMF{
         for (int i = 0; i < edgeNumber; ++i) {
             int _from,_to,_flow,_cost;
             sscanf(topo[i + pos],"%d %d %d %d",&_from,&_to,&_flow,&_cost);
+
             nodesOutFlow[_from] += _flow;
             nodesOutFlow[_to] += _flow;
             addEdge(_from,_to,_flow,_cost);
@@ -179,6 +214,10 @@ struct MCMF{
             }
             nodesOutFlow[netnode] += need;
             addEdge(netnode,vSink,need,0);
+            // 每个消费节点的需求
+            consumer_needed_flow[netnode] += need;
+            consumer_lost_flow[netnode] = 0;
+            consumerNodes.insert(netnode);
             needSum += need;
             Net2Consumer[netnode] = consumer;
         }
@@ -192,7 +231,81 @@ struct MCMF{
             ReplaceNodes.push_back(rankNodes[i].second);
         }
         reverse(ReplaceNodes.begin(),ReplaceNodes.end());
+
     }
+
+    vector<pair<int,int>> DPForAnswer(){
+//    求node_average_chain_cost 每个点的链路平均成本
+        for (int node = 0; node < nodeNumber; ++node) {
+            for(int i = G[node]; i ;i = edge[i].next){
+                if(i&1) continue;
+                int flow = edge[i].flow;
+                int cost = edge[i].cost;
+                node_average_chain_cost[node] +=(flow/out_flow[node])*cost;
+            }
+        }
+//        初始化group
+        for(int node = 0; node < nodeNumber; ++node){
+            for(int level = 0; level < num_level; ++level){
+                int bandwidth = min(Level[level].first,out_flow[node]);
+//                模拟实际情况求得cost
+                int cost = Level[level].second + positionPrice[node] + bandwidth * node_average_chain_cost[node];
+                group[node][level] = make_pair(bandwidth,cost);
+            }
+        }
+
+        int **dp = new int*[nodeNumber + 1];
+        for (int i = 0; i < nodeNumber + 1; ++i)
+            dp[i] = new int[needSum + 1];
+
+        pair<int,int> **zhuangtai = new pair<int,int>*[nodeNumber + 1];
+        for (int i = 0; i < nodeNumber + 1; ++i)
+            zhuangtai[i] = new pair<int,int>[needSum + 1];
+
+
+        memset(dp[0],0x3f, sizeof(int)*(needSum + 1));
+
+        dp[0][0] = 0;
+        int t = clock();
+        for(int i = 0; i < nodeNumber; ++i){
+            memcpy(dp[i+1], dp[i], (1 + needSum) * sizeof(int));
+            memcpy(zhuangtai[i+1], zhuangtai[i], (1 + needSum) * sizeof(pair<int,int>));
+
+
+            for(int need = 0; need <= needSum; ++need){
+                for(int k = 0; k < num_level; ++k){
+                    int tmpNeed = min(need+group[i][k].first,needSum);
+                    if(dp[i+1][tmpNeed] > dp[i][need] + group[i][k].second){
+
+                        dp[i+1][tmpNeed] = dp[i][need] + group[i][k].second;
+                        zhuangtai[i+1][tmpNeed] = make_pair(i<<16|need,k);
+                    }
+                }
+            }
+        }
+
+        int first,second;
+        first = nodeNumber;
+        second = needSum;
+        int cnt = 0;
+        vector<pair<int,int>>answer;
+        while (first){
+            pair<int,int>tmp;
+            tmp = zhuangtai[first][second];
+            first = tmp.first >> 16;
+            second = tmp.first & 65535;
+            answer.push_back(make_pair(first,tmp.second));
+            ++cnt;
+        }
+
+        int result = 0;
+        for(int i = 0; i < answer.size(); ++i){
+            auto e = answer[i];
+            result += group[e.first][e.second].second;
+        }
+        return answer;
+    }
+
 
 
 /*+++++++++++++++建超级源点++++++++++++++++++*/
@@ -204,10 +317,12 @@ struct MCMF{
                 //todo 实际中肯定不是无穷大
                 edge[tmpEdgeNum].flow = maxBandWidth;
                 edge[tmpEdgeNum ^ 1].flow = 0;
+                node_level[server] = num_level - 1;
             }else{
                 //todo 实际中肯定不是无穷大
                 addEdge(vSource,server,maxBandWidth,0);
                 server2edge[server] = edgeorder - 1;
+                node_level[server] = num_level - 1;
             }
         }
     }
@@ -221,10 +336,12 @@ struct MCMF{
                 //todo 实际中肯定不是无穷大
                 edge[tmpEdgeNum].flow = Level[server.second].first;
                 edge[tmpEdgeNum ^ 1].flow = 0;
+                node_level[server.first] = server.second;
             }else{
                 //todo 实际中肯定不是无穷大
                 addEdge(vSource,server.first,Level[server.second].first,0);
                 server2edge[server.first] = edgeorder - 1;
+                node_level[server.first] = server.second;
             }
         }
     }
@@ -240,6 +357,8 @@ struct MCMF{
         memset(inQueue,0,sizeof(inQueue));
         memset(preV,0,sizeof(preV));
         memset(preE,0,sizeof(preE));
+        memset(node_actual_flow,0,sizeof(node_actual_flow));
+        memset(node_level,0,sizeof(node_level));
 
         //memset(edge,0,sizeof(edge));
         //todo 所有边置为读进来的情况，注意有没有需要特殊处理的情况，比如汇点和源点
@@ -362,6 +481,9 @@ struct MCMF{
         return needSum == currentFlows;
     }
 
+
+
+
 /*+++++++++++++++求解可行流++++++++++++++++++*/
     int solve(){
         solveTimes ++;
@@ -371,6 +493,33 @@ struct MCMF{
             if(cur > ans) ans = cur;
         }
         return ans;
+    }
+
+/*+++++++++++++++统计所有信息++++++++++++++++++*/
+
+    void statistic(){
+        //总的缺失信息
+        total_lost_flow = needSum - currentFlows;
+        for(int n = 0; n<nodeNumber; ++n){
+            for(int i = G[n]; i ; i = edge[i].next){
+                if(i & 1)continue;
+                node_actual_flow[n] += edge[i^1].flow;
+            }
+        }
+        for(int i = G[vSink]; i; i = edge[i].next){
+            if(i&1){
+                consumer_lost_flow[edge[i].to] = edge[i^1].flow;
+            }
+        }
+
+        for(int i = G[vSource]; i ; i = edge[i].next){
+            if (i&1) continue;
+            if (edge[i^1].flow  == 0)continue;
+            int v = edge[i].to;
+            source_server_flow[v] = edge[i^1].flow;
+//            cout << "node " << v << "    actual  "<<node_actual_flow[v] << " ability "<< min(out_flow[v],Level[node_level[v]].first) << endl;
+            out_percent[v] = float(node_actual_flow[v]) / float(out_flow[v]) * 100;
+        }
     }
 
 /*+++++++++++++++打印一条路径++++++++++++++++++*/
@@ -410,7 +559,7 @@ struct MCMF{
                 last = v;
             }
             // todo 需要处理输出
-            sprintf(temp,"%d %d %d\n",Net2Consumer[last],minimum,server2level[server]);
+            sprintf(temp,"%d %d %d\n",Net2Consumer[last],minimum,node_level[server]);
             strcat(out,temp);
         }
         return haspath;
@@ -418,9 +567,6 @@ struct MCMF{
 
 /*+++++++++++++++打印所有路径++++++++++++++++++*/
     void printAllPath(){
-        for(auto server:best_answer){
-            server2level[server.first] = server.second;
-        }
         while(printOnePath(vSink))
             ++flowCnt;
     }
@@ -457,132 +603,26 @@ struct MCMF{
             int last;
             for (auto v:tmpPre) {
                 if(v == vSink) continue;
-                cout << v << " ";
+//                cout << v << " ";
                 last = v;
             }
-            cout << Net2Consumer[last];
-            cout << endl;
+//            cout << Net2Consumer[last];
+//            cout << endl;
         }
         return haspath;
     }
 
-/*+++++++++++++++获取整个cost信息++++++++++++++++++*/
-    //首先默认为最高级，然后根据求得的结果以及百分比，来优化等级信息
-    bool getTotalCost(vector<int> servers,double percent){
-        bool better = false;
-        push_better = false;
-        pushable = false;
-        clear();
-        // 默认为用的最高级的case
-        buildSource(servers);
-        auto beforeResult = solve();
-        if(!isFeasibleFlow()){
-            current_cost = -1;
-//            cout << "fail" << endl;
-            return false;
-        }
-        int beforeTotalCost = 0;
-        int afterTotalCost = 0;
-
-        int server_position_cost = 0;
-        int before_server_level_cost = 0;
-        int after_server_level_cost = 0;
-        // solve之后 每个服务器的出度应该求出来了
-        // 再对所有的服务器看看能降级的是否应该降个级
-        int beforeDegradationCost = 0;
-        // 求出所有节点对应的服务器等级
-        // 同时更改服务器等级 得到newServers
-
-        int decreasePostionCost = 0;
-
-        vector<pair<int,int>> origiServers;
-        vector<pair<int,int>> newServers;
-        for(auto server : servers){
-            int edgeNumber = server2edge[server];
-            int outflows = edge[edgeNumber ^ 1].flow;
-
-            server_position_cost += positionPrice[server];
-            int levelOder = 0;
-
-            for(int i = 0; i < Level.size(); ++i){
-                // 找出等级 并适当的降级
-                if (outflows <= Level[i].first){
-                    origiServers.push_back(make_pair(server,i));
-                    before_server_level_cost += Level[i].second;
-
-                    if(i == 0){
-                        if(outflows > Level[0].first * percent){
-                            newServers.push_back(make_pair(server, i));
-                            after_server_level_cost += Level[i].second;
-                            break;
-                        }
-                        // 因为当前点取消，所以当前的位置价格也会取消
-                        decreasePostionCost += positionPrice[server];
-                        break;
-                    }
-                    if((outflows - Level[i - 1].first) < (Level[i].first - Level[i-1].first) * percent){
-                        newServers.push_back(make_pair(server, i - 1));
-                        after_server_level_cost += Level[i-1].second;
-                    }else{
-                        newServers.push_back(make_pair(server, i));
-                        after_server_level_cost += Level[i].second;
-                    }
-                    break;
-                }
-            }
-        }
-        beforeTotalCost = server_position_cost + before_server_level_cost + beforeResult;
-
-        clear();
-        buildSource(newServers);
-        int afterResult = solve();
-        afterTotalCost = server_position_cost - decreasePostionCost + after_server_level_cost + afterResult;
-
-        if (isFeasibleFlow()) {
-            pushable = true;
-            if (afterTotalCost < beforeTotalCost){
-                push_better = true;
-                if(afterTotalCost < all_cost){
-                    all_cost = afterTotalCost;
-                    best_answer = newServers;
-                    better = true;
-                }else{
-                    //cout << "expensive" <<endl;
-                }
-            }else{
-                if(beforeTotalCost < all_cost){
-                    all_cost = beforeTotalCost;
-                    best_answer = origiServers;
-                    better = true;
-                }else{
-                    //cout << "expensive" <<endl;
-                }
-            }
-        } else{
-            current_cost = -1;
-            if(beforeTotalCost < all_cost){
-                all_cost = beforeTotalCost;
-                best_answer = origiServers;
-                better = true;
-            }else{
-                //cout << "expensive" <<endl;
-            }
-            clear();
-            buildSource(best_answer);
-            solve();
-        }
-        return better;
-    }
-
     //输入服务器等级，计算总cost
     bool getTotalCost(vector<pair<int,int>> servers){
+        better = false;
         clear();
         // 默认为用的最高级的case
         buildSource(servers);
         auto flowTotalCost = solve();
-        if(!isFeasibleFlow()){
-            return false;
-        }
+//        if(!isFeasibleFlow()){
+//            return false;
+//        }
+
         int positionPriceTotal = 0;
         int serverLevelPrice = 0;
         for(auto server: servers){
@@ -590,13 +630,16 @@ struct MCMF{
             serverLevelPrice += Level[server.second].second;
         }
         int totalPrice = positionPriceTotal + serverLevelPrice + flowTotalCost;
-        if(totalPrice < all_cost) {
-            best_answer = servers;
-            all_cost = totalPrice;
-            return true;
-        }else{
-            return false;
+        current_cost = totalPrice;
+        if(isFeasibleFlow()){
+            if(totalPrice < all_cost) {
+                best_answer = servers;
+                all_cost = totalPrice;
+                better = true;
+            }
         }
+        statistic();
+//        cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
     }
 };
 

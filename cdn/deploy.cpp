@@ -91,7 +91,7 @@ void printOrderServerLevel(){
     }
     sort(result.begin(),result.end());
     for(auto it = result.begin(); it != result.end(); ++it){
-        cout<< "cost  " << it->first << "level  " << it->second;
+//        cout<< "cost  " << it->first << "level  " << it->second;
     }
 }
 
@@ -109,7 +109,7 @@ vector<int> getVectorConsumerLost( ){
     sort(tmp_lost.begin(),tmp_lost.end());
     reverse(tmp_lost.begin(),tmp_lost.end());
     for(auto it = tmp_lost.begin(); it != tmp_lost.end(); ++it){
-        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
+//        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
     }
 
     vector<int> answer;
@@ -169,13 +169,13 @@ vector<int> A_minus_B(vector<int> A, vector<int> B){
 void printVector(vector<int>v){
     sort(v.begin(),v.end());
     for(int i = 0;  i< v.size(); ++i){
-        cout << v[i] << endl;
+//        cout << v[i] << endl;
     }
 }
 
 void printNodeActualFlow(vector<int>nodes){
     for(int i = 0; i < nodes.size(); ++i){
-        cout<<"node: "<< nodes[i]  << "    actual flow" << node_actual_flow[nodes[i]] << "  ability  "<< out_flow[nodes[i]] << endl;
+//        cout<<"node: "<< nodes[i]  << "    actual flow" << node_actual_flow[nodes[i]] << "  ability  "<< out_flow[nodes[i]] << endl;
     }
 }
 
@@ -214,7 +214,7 @@ void BFSOverLap(vector<int> nodes){
     for(auto it = tmp.begin();it != tmp.end(); ++it){
         ++cnt;
         if(cnt == 10)break;
-        cout << "count "<< it->first << "   node   "<< it->second << endl;
+//        cout << "count "<< it->first << "   node   "<< it->second << endl;
     }
 
 }
@@ -277,7 +277,7 @@ vpii getAnswerFromConsumerLost(vpii servers){
     sort(tmp_lost.begin(),tmp_lost.end());
     reverse(tmp_lost.begin(),tmp_lost.end());
     for(auto it = tmp_lost.begin(); it != tmp_lost.end(); ++it){
-        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
+//        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
     }
 
 
@@ -396,16 +396,16 @@ vector<int> bfs(vector<int> servers,vector<int> consumers){
     }
     unordered_map<int,int> tmpmap;
     for(auto c : consumers){
-        cout << "cousumer  " << c << ": servers";
+//        cout << "cousumer  " << c << ": servers";
         for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
-            cout << " " << *it << " ";
+//            cout << " " << *it << " ";
             if(tmpmap.count(*it)){
                 tmpmap[*it] += 1;
             }else{
                 tmpmap[*it] = 1;
             }
         }
-        cout << endl;
+//        cout << endl;
     }
     vpii res;
     for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
@@ -418,6 +418,22 @@ vector<int> bfs(vector<int> servers,vector<int> consumers){
         resv.push_back(it->second);
     }
     return resv;
+}
+
+int getLevel(int flow){
+    if(flow == 0){
+        return -1;
+    }
+    if(flow > Level[num_level - 1].first)return num_level - 1;
+    int level;
+    level = 0;
+    for(int i = 0; i < num_level; ++i){
+        if(flow <= Level[i].first){
+            level = i;
+            break;
+        }
+    }
+    return level;
 }
 
 vpii getEfficientBackEndServers(vpii exclude,int num){
@@ -447,7 +463,7 @@ vpii getEfficientBackEndServers(vpii exclude,int num){
         result.push_back(ret[i].second);
     }
     for(int i = 0; i < result.size(); ++i){
-        cout<< "back server   " <<result[i].first << " level: " << result[i].second << endl;
+//        cout<< "back server   " <<result[i].first << " level: " << result[i].second << endl;
     }
     return result;
 }
@@ -480,8 +496,12 @@ vector<pair<int,int>> addHotPotentialServersFromOutOfConsumer(vector<pair<int,in
 };
 
 
-bool cmp_flow_down(pair<int,int> p, pair<int,int> q){
-    return node_actual_flow[p.first] > node_actual_flow[q.first];
+bool cmp_flow_down(int p, int q){
+    return node_actual_flow[p] > node_actual_flow[q];
+}
+
+bool cmp_level_up(pair<int,int> p, pair<int,int> q){
+    return p.second < q.second;
 }
 
 
@@ -525,17 +545,73 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
     result_1 = adjustNodes(result_1);
     MCF.getTotalCost(result_1);
 
-    result_1 = shengjidayu(result_1);
-    MCF.getTotalCost(result_1);
+//    result_1 = shengjidayu(result_1);
+//    MCF.getTotalCost(result_1);
+
+    sort(result_1.begin(),result_1.end(),cmp_level_up);
     int iter_num = result_1.size();
     vpii::iterator it = result_1.begin();
     while (iter_num--) {
+        if (return_time() > 82)
+            break;
         pair<int, int> now = *it;
         result_1.erase(it);
         int last_cost = all_cost;
         MCF.getTotalCost(result_1);
-        if (all_cost == last_cost)
+        if (!MCF.isFeasibleFlow()){
+            vector<int> tmp_consumer = notEnoughConsumers();
+            a2 = result_1;
+            a2 = addServersFromConsumer(a2,tmp_consumer);
+            MCF.getTotalCost(a2);
             result_1.push_back(now);
+        }
+        else if (all_cost == last_cost) {
+
+            result_1.push_back(now);
+        }
+    }
+
+    unordered_set<int> nownow;
+    vector<int> notin;
+    if (MCF.nodeNumber < 1000){
+        for (auto it3 = best_answer.begin(); it3 != best_answer.end(); ++it3){
+            nownow.insert(it3->first);
+        }
+        for (int z = 0; z < MCF.nodeNumber; ++z){
+            if (nownow.find(z) == nownow.end())
+                notin.push_back(z);
+        }
+        sort(notin.begin(),notin.end(),cmp_flow_down);
+        for (auto it4 = notin.begin(); it4 != notin.end(); ++it4){
+            if (return_time() > 82)
+                break;
+            if (node_actual_flow[*it4] == 0)
+                break;
+            result_1 = best_answer;
+            result_1.push_back(pair<int,int>(*it4,getLevel(node_actual_flow[*it4])));
+            sort(result_1.begin(),result_1.end(),cmp_level_up);
+            iter_num = result_1.size();
+            it = result_1.begin();
+            while (iter_num--) {
+                if (return_time() > 82)
+                    break;
+                pair<int, int> now = *it;
+                result_1.erase(it);
+                int last_cost = all_cost;
+                MCF.getTotalCost(result_1);
+                if (!MCF.isFeasibleFlow()){
+                    vector<int> tmp_consumer = notEnoughConsumers();
+                    a2 = result_1;
+                    a2 = addServersFromConsumer(a2,tmp_consumer);
+                    MCF.getTotalCost(a2);
+                    result_1.push_back(now);
+                }
+                else if (all_cost == last_cost) {
+
+                    result_1.push_back(now);
+                }
+            }
+        }
     }
 
 //    result_1 = shengjidayu(result_1);
