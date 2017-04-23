@@ -21,6 +21,7 @@ int positionPrice[NODEMAX + 10];
 
 bool push_better;
 bool pushable;
+bool better;
 
 int nodesOutFlow[NODEMAX + 10];
 vector <int> ReplaceNodes;
@@ -83,6 +84,44 @@ int return_time()
 }
 
 
+void printOrderServerLevel(){
+    vpii result;
+    for(int i = 0; i < Level.size(); ++i){
+        result.push_back(make_pair(float(Level[i].second) /float(Level[i].first),i));
+    }
+    sort(result.begin(),result.end());
+    for(auto it = result.begin(); it != result.end(); ++it){
+        cout<< "cost  " << it->first << "level  " << it->second;
+    }
+}
+
+vector<int> getVectorConsumerLost( ){
+//    非零点
+    int notzero_cnt = 0;
+    int tmpTotalLost = 0;
+    vector<pair<int,int>>tmp_lost;
+    for(auto it = consumer_lost_flow.begin(); it!= consumer_lost_flow.end(); ++it){
+        if(it->second > 0) {
+            ++notzero_cnt;
+            tmp_lost.push_back(make_pair(it->second,it->first));
+        }
+    }
+    sort(tmp_lost.begin(),tmp_lost.end());
+    reverse(tmp_lost.begin(),tmp_lost.end());
+    for(auto it = tmp_lost.begin(); it != tmp_lost.end(); ++it){
+        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
+    }
+
+    vector<int> answer;
+    int len = tmp_lost.size();
+    for(int i = 0; i < len;++i){
+        tmpTotalLost += consumer_needed_flow[tmp_lost[i].second];
+        answer.push_back(tmp_lost[i].second);
+        if(tmpTotalLost >= total_lost_flow) break;
+    }
+    return answer;
+}
+
 
 vector<int> combine(vector<int>A,vector<int>B){
     set<int>result_set;
@@ -141,6 +180,7 @@ void printNodeActualFlow(vector<int>nodes){
 }
 
 
+
 void BFSOverLap(vector<int> nodes){
     //todo 过滤掉消费点，过滤掉已有服务器，过滤掉已经删除的点
     //todo 对需要求得这些节点分别进行bfs一层，然后求交集，然后根据某种算法排序，选取一个最小的相交，求交集的元素包括自己本身，先遍历一层
@@ -189,38 +229,10 @@ vector<int> notEnoughConsumers(){
     return result;
 }
 
-
-vector<int> printConsumerLost( ){
-//    非零点
-    int notzero_cnt = 0;
-    int tmpTotalLost = 0;
-    vector<pair<int,int>>tmp_lost;
-    for(auto it = consumer_lost_flow.begin(); it!= consumer_lost_flow.end(); ++it){
-        if(it->second > 0) {
-            ++notzero_cnt;
-            tmp_lost.push_back(make_pair(it->second,it->first));
-        }
-    }
-    sort(tmp_lost.begin(),tmp_lost.end());
-    reverse(tmp_lost.begin(),tmp_lost.end());
-    for(auto it = tmp_lost.begin(); it != tmp_lost.end(); ++it){
-        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
-    }
-//    cout<< "still need: " << total_lost_flow << endl;
-//    cout<<" still needed consumer count " << notzero_cnt << "total cousumer count" << consumer_lost_flow.size() << endl;
-    vector<int> answer;
-    int len = tmp_lost.size();
-    for(int i = 0; i < len;++i){
-        tmpTotalLost += consumer_needed_flow[tmp_lost[i].second];
-        answer.push_back(tmp_lost[i].second);
-        if(tmpTotalLost >= total_lost_flow) break;
-    }
-    return answer;
-}
-
-vector<pair<int,int>>getPairAnswerFromVector(vector<int> nodes){
+vector<pair<int,int>>getPairAnswerFromVector(vector<int> nodes,set<int> anserset){
     vector<pair<int,int>> result;
     for(int i = 0; i < nodes.size(); ++i){
+        if(anserset.count(nodes[i]))continue;
         int tmplevel = 0;
         int minimum_ability = 0;
         if(consumerNodes.count(nodes[i])){
@@ -243,11 +255,93 @@ vector<pair<int,int>>getPairAnswerFromVector(vector<int> nodes){
     return result;
 };
 
+vpii getAnswerFromConsumerLost(vpii servers){
+
+//    非零点
+    set <int> answerSet;
+    for(int i = 0; i < servers.size(); ++i){
+        answerSet.insert(servers[i].first);
+        if(consumerNodes.count(servers[i].first)){
+            servers[i].second += 1;
+        }
+    }
+    int notzero_cnt = 0;
+    int tmpTotalLost = 0;
+    vector<pair<int,int>>tmp_lost;
+    for(auto it = consumer_lost_flow.begin(); it!= consumer_lost_flow.end(); ++it){
+        if(it->second > 0) {
+            ++notzero_cnt;
+            tmp_lost.push_back(make_pair(it->second,it->first));
+        }
+    }
+    sort(tmp_lost.begin(),tmp_lost.end());
+    reverse(tmp_lost.begin(),tmp_lost.end());
+    for(auto it = tmp_lost.begin(); it != tmp_lost.end(); ++it){
+        cout<<"consumer lost" << it->first << " node  "<< it->second<<endl;
+    }
+
+
+    vector<int> answer;
+    int len = tmp_lost.size();
+    for(int i = 0; i < len;++i){
+        tmpTotalLost += consumer_needed_flow[tmp_lost[i].second];
+        answer.push_back(tmp_lost[i].second);
+        if(tmpTotalLost >= total_lost_flow) break;
+    }
+
+    vpii result = getPairAnswerFromVector(answer,answerSet);
+    for(int i = 0 ; i < result.size(); ++i){
+        servers.push_back(result[i]);
+    }
+    return servers;
+}
+
+
+
 
 vector<pair<int,int>>adjustNodes(vector<pair<int,int>> nodes){
-//    todo 需要策略去做这些事情
+    //todo 需要策略去做这些事情
     //todo 如果服务器等级很低，即性价比比较低，同时服务器的实际输出比它的能高，同时出度还没有满足，那么我们升级服务器，当然不能升到最高级
+    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+        if(it->second == 0)continue;
+        while(it->second != 0 && node_actual_flow[it->first] <= Level[it->second - 1].first) {
+            it->second -= 1;
+        }
+    }
+    return nodes;
+};
 
+vector<pair<int,int>> addServer(vpii answer,vector<int> server){
+    for(auto it = server.begin(); it != server.end(); ++it){
+       answer.push_back(make_pair(*it,0));
+    }
+    return answer;
+};
+
+
+vector<pair<int,int>> upperServer(vpii answer,vector<int> server){
+    set<int> tmpSet(server.begin(),server.end());
+    for(auto it = answer.begin(); it != answer.end(); ++it){
+        if(tmpSet.count(it->first)){
+            if(it->second < num_level){
+                it->second += 1;
+            }
+        }
+    }
+    return answer;
+};
+
+
+vector<pair<int,int>> shengjidayu(vector<pair<int,int>> servers){
+    for(auto it = servers.begin(); it != servers.end(); ++it){
+        int v = it->first;
+        float ability = min(out_flow[v],Level[node_level[v]].first);
+        if (node_actual_flow[v] > ability){
+            if (it->second < MCF.levelNum - 1)
+                ++it->second;
+        }
+    }
+    return servers;
 };
 
 vector<pair<int,int>> deleteLowEffiecientServers(vector<pair<int,int>> servers){
@@ -255,7 +349,7 @@ vector<pair<int,int>> deleteLowEffiecientServers(vector<pair<int,int>> servers){
     for(auto it = servers.begin(); it != servers.end(); ++it){
         int v = it->first;
         float ability = min(out_flow[v],Level[node_level[v]].first);
-        if( ability/node_actual_flow[v] >= 1.5){
+        if( ability/node_actual_flow[v] >= 1.6){
             deletedNodes.insert(v);
         }
         if(node_level[v] == 0){
@@ -271,7 +365,94 @@ vector<pair<int,int>> deleteLowEffiecientServers(vector<pair<int,int>> servers){
     return result;
 };
 
-vpii addHotPotentialServersFromConsumer(vpii servers,vector<int>nodes){
+//缺失流量的服务器
+vector<int> bfs(vector<int> servers,vector<int> consumers){
+    unordered_map<int,set<int>> consumerMap;
+
+    set<int> mySet(consumers.begin(),consumers.end());
+    for(auto c : consumers){
+        consumerMap[c] = {};
+    }
+    set<int> visited;
+
+    for (auto server: servers){
+        queue<int> Q;
+        Q.push(server);
+        while(!Q.empty()){
+            int tmpv = Q.front();
+            Q.pop();
+            if(visited.count(tmpv))continue;
+            visited.insert(tmpv);
+            for(int i = MCF.G[tmpv]; i ; i = MCF.edge[i].next){
+                if (i & 1) continue;
+                if (MCF.edge[i].flow == 0) continue;
+                if (MCF.edge[i^1].flow == 0)continue;
+                int node = MCF.edge[i].to;
+                if(mySet.count(node))consumerMap[node].insert(server);
+                Q.push(node);
+            }
+        }
+        visited.clear();
+    }
+    unordered_map<int,int> tmpmap;
+    for(auto c : consumers){
+        cout << "cousumer  " << c << ": servers";
+        for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
+            cout << " " << *it << " ";
+            if(tmpmap.count(*it)){
+                tmpmap[*it] += 1;
+            }else{
+                tmpmap[*it] = 1;
+            }
+        }
+        cout << endl;
+    }
+    vpii res;
+    for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
+        res.push_back(make_pair(it->second,it->first));
+    }
+    sort(res.begin(),res.end());
+    reverse(res.begin(),res.end());
+    vector<int> resv;
+    for(auto it = res.begin(); it != res.end(); ++it){
+        resv.push_back(it->second);
+    }
+    return resv;
+}
+
+vpii getEfficientBackEndServers(vpii exclude,int num){
+//  todo 也可以通过排序来提高某些满流量的服务器的等级 同时降低其它流量服务器的等级
+    vector<int> excludeServers;
+    for(int i = 0; i < exclude.size(); ++i){
+        excludeServers.push_back(exclude[i].first);
+    }
+
+    set<int>exset(excludeServers.begin(),excludeServers.end());
+    vector<pair<int ,pair<int,int>>> ret;
+    for(int node = 0; node < MCF.nodeNumber; ++node){
+        if(exset.count(node)) continue;
+        for(int level = 0; level < num_level; ++level){
+            int bandwidth = min(Level[level].first,out_flow[node]);
+//                模拟实际情况求得cost
+            int cost = Level[level].second + positionPrice[node] + bandwidth * node_average_chain_cost[node];
+            ret.push_back(make_pair(cost,make_pair(node,level)));
+        }
+    }
+    sort(ret.begin(),ret.end());
+    int len = ret.size();
+    set<int>quchong;
+    vpii result;
+    for(int i = 0; i < min(len,num); ++i){
+        if(quchong.count(ret[i].second.first))continue;
+        result.push_back(ret[i].second);
+    }
+    for(int i = 0; i < result.size(); ++i){
+        cout<< "back server   " <<result[i].first << " level: " << result[i].second << endl;
+    }
+    return result;
+}
+
+vpii addServersFromConsumer(vpii servers,vector<int>nodes){
     unordered_set<int> heihei;
     unordered_set<int> intersection;
     for(auto it = servers.begin(); it != servers.end(); ++it){
@@ -299,87 +480,97 @@ vector<pair<int,int>> addHotPotentialServersFromOutOfConsumer(vector<pair<int,in
 };
 
 
+bool cmp_flow_down(pair<int,int> p, pair<int,int> q){
+    return node_actual_flow[p.first] > node_actual_flow[q.first];
+}
+
+
 //你要完成的功能总入口
 void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 {
-
+    //    vector<pair<int,int>>answer_0{{0,4},{45,5},{55,5},{56,4},{60,4},{78,5},{105,4},{107,5},{133,4},{134,5},{142,4},{152,0},{161,1},{177,4},{236,3},{242,3},{245,4},{274,4},{278,5},{290,2},{291,0},{296,4},{314,3},{333,4},{343,2},{359,4},{373,4},{389,4},{390,2},{394,3},{409,4},{411,4},{416,4},{445,5},{458,2},{460,3},{467,4},{470,4},{495,5},{497,5},{515,4},{518,1},{526,4},{527,1},{538,4},{556,4},{557,5},{570,5},{577,4},{582,4},{586,3},{597,4},{615,1},{617,3},{625,5},{640,4},{641,4},{650,4},{656,3},{657,3},{666,4},{669,4},{683,2},{688,4},{697,4},{700,3},{714,4},{724,4},{751,4},{767,4},{804,4},{835,5},{847,3},{872,4},{883,4},{894,4},{920,1},{934,4},{940,4},{952,5},{970,0},{984,5},{991,2},{993,4},{1002,4},{1017,4},{1019,1},{1029,1},{1031,4},{1032,4},{1034,5},{1053,1},{1056,4},{1070,2},{1076,0},{1080,5},{1090,4},{1103,3},{1109,5},{1110,3},{1118,4},{1119,5},{1184,3},{1187,4}};
     return_time();
 	MCF.clear();
 	MCF.buildGraph(topo);
 
 
+// 构造迭代
     vpii dp_answer = MCF.DPForAnswer();
 
     MCF.getTotalCost(dp_answer);
-    MCF.statistic();
-
-    dp_answer = deleteLowEffiecientServers(dp_answer);//去除低效的点
-
-    vector<int> dp_vector;
-    for(int i = 0; i < dp_answer.size(); ++i){
-        dp_vector.push_back(dp_answer[i].first);
-    }
-
-
-
-    vector<int>c_answer = printConsumerLost();
-    vector<int>c_intersect_dp = A_minus_B(c_answer,dp_vector);
-    cout <<"fuck" <<c_intersect_dp.size() << endl;
-    vpii c_pair_answer = getPairAnswerFromVector(c_intersect_dp);
-    vpii myAnswer = combinePairAnswer(c_pair_answer,dp_answer);
-
     int minimumLost = INT32_MAX;
-    int price = 0;
+    int minimumResult = INT32_MAX;
     int cnt = 10;
-    vpii myResult;
-    while(--cnt) {
-        MCF.getTotalCost(myAnswer);
-        MCF.statistic();
-
-
-        if (total_lost_flow < minimumLost){
-            price = current_cost;
+    vpii result_1;
+    while (--cnt) {
+        dp_answer = deleteLowEffiecientServers(dp_answer);//去除低效的点
+        MCF.getTotalCost(dp_answer);
+        dp_answer = getAnswerFromConsumerLost(dp_answer);
+        MCF.getTotalCost(dp_answer);
+        if(total_lost_flow < minimumLost){
             minimumLost = total_lost_flow;
+            result_1 = dp_answer;
             vector<int> tmp_consumer = notEnoughConsumers();
-            myResult = addHotPotentialServersFromConsumer(myAnswer,tmp_consumer);
-
+            result_1 = addServersFromConsumer(result_1,tmp_consumer);
         }
+    }
 
 
 
-        myAnswer = deleteLowEffiecientServers(myAnswer);
-        vector<int> tmpMyAnser;
 
-        for(auto it = myAnswer.begin(); it != myAnswer.end(); ++it){
-            tmpMyAnser.push_back(it->first);
-        }
-        c_answer = printConsumerLost();
-        c_answer = A_minus_B(c_answer,tmpMyAnser);
-        c_pair_answer = getPairAnswerFromVector(c_answer);
+    vector<pair<int,int>> a2;
+    int last_cost;
 
-        myAnswer = combinePairAnswer(myAnswer,c_pair_answer);
+    MCF.getTotalCost(result_1);
+    result_1 = adjustNodes(result_1);
+    MCF.getTotalCost(result_1);
 
+    result_1 = shengjidayu(result_1);
+    MCF.getTotalCost(result_1);
+    int iter_num = result_1.size();
+    vpii::iterator it = result_1.begin();
+    while (iter_num--) {
+        pair<int, int> now = *it;
+        result_1.erase(it);
+        int last_cost = all_cost;
+        MCF.getTotalCost(result_1);
+        if (all_cost == last_cost)
+            result_1.push_back(now);
+    }
+
+//    result_1 = shengjidayu(result_1);
+//    MCF.getTotalCost(result_1);
+////    result_1 = adjustNodes(result_1);
+////    MCF.getTotalCost(result_1);
+//    //sort(result_1.begin(),result_1.end(),cmp_flow_down);
+//    //result_1.pop_back();
+//    for (auto it2 = result_1.begin(); it2 != result_1.end();){
+////        if (return_time() > 86)
+////            break;
+//        a2 = result_1;
+//        a2.erase(a2.begin() + (it2 - result_1.begin()));
+//        last_cost = all_cost;
+//        MCF.getTotalCost(a2);
+//        a2 = adjustNodes(a2);
+//        MCF.getTotalCost(a2);
+//        if(all_cost < last_cost){
+//            result_1.erase(it2);
+//            continue;
+//        }
+//        ++it2;
+//    }
+
+//    result_1 = adjustNodes(result_1);
+//    MCF.getTotalCost(result_1);
+
+//    best_answer = adjustNodes(best_answer);
+    MCF.getTotalCost(best_answer);
+    cout << "minimumLost  " << minimumLost << " current "<< current_cost << endl;
+    if(MCF.isFeasibleFlow()){
+        cout << "yes" << current_cost << endl;
     }
 
 
-
-
-    MCF.getTotalCost(myResult);
-    MCF.statistic();
-    for (auto it = myResult.begin(); it != myResult.end(); ++it) {
-        if(it->second == 0)continue;
-        while(it->second != 0 && node_actual_flow[it->first] <= Level[it->second - 1].first) {
-            it->second -= 1;
-        }
-    }
-    MCF.getTotalCost(myResult);
-    cout <<" minimumLost " <<total_lost_flow <<" price " <<current_cost << " my size  "<<myResult.size() << endl;
-    if(MCF.isFeasibleFlow()) {
-        for(int i = 0; i < myResult.size(); ++i){
-            node_level[myResult[i].first] = myResult[i].second;
-        }
-        cout<< "feasible" << current_cost << endl;
-    }
 	MCF.printAllPath();
 	sprintf(temp, "%d\n\n", MCF.flowCnt);
 	strcat(temp, out);
@@ -387,13 +578,9 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 // 需要输出的内容
 	char * topo_file = (char *) temp;
 
-#ifdef PRINT_COST
-    printf("server num = %lld\n",myResult.size());
-	printf("all cost = %d\n",all_cost);
-#endif
-	// 直接调用输出文件的方法输出到指定文件中(ps请注意格式的正确性，如果有解，第一行只有一个数据；第二行为空；第三行开始才是具体的数据，数据之间用一个空格分隔开)
 	write_result(topo_file, filename);
 #ifdef PRINT_TIME
 	printf("now time is %d\n",return_time());
 #endif
 }
+

@@ -59,6 +59,7 @@ extern int positionPrice[NODEMAX + 10];
 
 extern bool push_better;
 extern bool pushable;
+extern bool better;
 
 extern int nodesOutFlow[NODEMAX + 10];
 extern vector <int> ReplaceNodes;
@@ -295,9 +296,7 @@ struct MCMF{
             answer.push_back(make_pair(first,tmp.second));
             ++cnt;
         }
-        cout<<"DPNode_Count" << cnt << endl;
-        cout << "DPAnswer" << endl;
-        cout <<dp[nodeNumber][needSum] << endl;
+
         int result = 0;
         for(int i = 0; i < answer.size(); ++i){
             auto e = answer[i];
@@ -477,8 +476,7 @@ struct MCMF{
 
 /*+++++++++++++++判断是否是可行流++++++++++++++++++*/
     bool isFeasibleFlow(){
-        cout << currentFlows << endl;
-        cout << needSum << endl;
+
         return needSum == currentFlows;
     }
 
@@ -501,7 +499,6 @@ struct MCMF{
     void statistic(){
         //总的缺失信息
         total_lost_flow = needSum - currentFlows;
-        cout<< "total_lost_flow"  << total_lost_flow << endl;
         for(int n = 0; n<nodeNumber; ++n){
             for(int i = G[n]; i ; i = edge[i].next){
                 if(i & 1)continue;
@@ -614,117 +611,9 @@ struct MCMF{
         return haspath;
     }
 
-/*+++++++++++++++获取整个cost信息++++++++++++++++++*/
-    //首先默认为最高级，然后根据求得的结果以及百分比，来优化等级信息
-    bool getTotalCost(vector<int> servers,double percent){
-        bool better = false;
-        push_better = false;
-        pushable = false;
-        clear();
-        // 默认为用的最高级的case
-        buildSource(servers);
-        auto beforeResult = solve();
-        if(!isFeasibleFlow()){
-            current_cost = -1;
-//            cout << "fail" << endl;
-            return false;
-        }
-        int beforeTotalCost = 0;
-        int afterTotalCost = 0;
-
-        int server_position_cost = 0;
-        int before_server_level_cost = 0;
-        int after_server_level_cost = 0;
-        // solve之后 每个服务器的出度应该求出来了
-        // 再对所有的服务器看看能降级的是否应该降个级
-        int beforeDegradationCost = 0;
-        // 求出所有节点对应的服务器等级
-        // 同时更改服务器等级 得到newServers
-
-        int decreasePostionCost = 0;
-
-        vector<pair<int,int>> origiServers;
-        vector<pair<int,int>> newServers;
-        for(auto server : servers){
-            int edgeNumber = server2edge[server];
-            int outflows = edge[edgeNumber ^ 1].flow;
-
-            server_position_cost += positionPrice[server];
-            int levelOder = 0;
-
-            for(int i = 0; i < Level.size(); ++i){
-                // 找出等级 并适当的降级
-                if (outflows <= Level[i].first){
-                    origiServers.push_back(make_pair(server,i));
-                    before_server_level_cost += Level[i].second;
-
-                    if(i == 0){
-                        if(outflows > Level[0].first * percent){
-                            newServers.push_back(make_pair(server, i));
-                            after_server_level_cost += Level[i].second;
-                            break;
-                        }
-                        // 因为当前点取消，所以当前的位置价格也会取消
-                        decreasePostionCost += positionPrice[server];
-                        break;
-                    }
-                    if((outflows - Level[i - 1].first) < (Level[i].first - Level[i-1].first) * percent){
-                        newServers.push_back(make_pair(server, i - 1));
-                        after_server_level_cost += Level[i-1].second;
-                    }else{
-                        newServers.push_back(make_pair(server, i));
-                        after_server_level_cost += Level[i].second;
-                    }
-                    break;
-                }
-            }
-        }
-        beforeTotalCost = server_position_cost + before_server_level_cost + beforeResult;
-
-        clear();
-        buildSource(newServers);
-        int afterResult = solve();
-        afterTotalCost = server_position_cost - decreasePostionCost + after_server_level_cost + afterResult;
-
-        if (isFeasibleFlow()) {
-            pushable = true;
-            if (afterTotalCost < beforeTotalCost){
-                push_better = true;
-                if(afterTotalCost < all_cost){
-                    all_cost = afterTotalCost;
-                    best_answer = newServers;
-                    better = true;
-                }else{
-                    //cout << "expensive" <<endl;
-                }
-            }else{
-                if(beforeTotalCost < all_cost){
-                    all_cost = beforeTotalCost;
-                    best_answer = origiServers;
-                    better = true;
-                }else{
-                    //cout << "expensive" <<endl;
-                }
-            }
-        } else{
-            current_cost = -1;
-            if(beforeTotalCost < all_cost){
-                all_cost = beforeTotalCost;
-                best_answer = origiServers;
-                better = true;
-            }else{
-                //cout << "expensive" <<endl;
-            }
-            clear();
-            buildSource(best_answer);
-            solve();
-        }
-        return better;
-    }
-
     //输入服务器等级，计算总cost
     bool getTotalCost(vector<pair<int,int>> servers){
-
+        better = false;
         clear();
         // 默认为用的最高级的case
         buildSource(servers);
@@ -742,8 +631,13 @@ struct MCMF{
         int totalPrice = positionPriceTotal + serverLevelPrice + flowTotalCost;
         current_cost = totalPrice;
         if(isFeasibleFlow()){
-            all_cost = min(all_cost,totalPrice);
+            if(totalPrice < all_cost) {
+                best_answer = servers;
+                all_cost = totalPrice;
+                better = true;
+            }
         }
+        statistic();
         cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
     }
 };
