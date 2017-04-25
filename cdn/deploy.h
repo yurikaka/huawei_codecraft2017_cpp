@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <unordered_map>
 #include <stdint.h>
-#include <unordered_set>
 
 
 
@@ -49,7 +48,7 @@ extern int current_cost;
 
 extern int num_level;
 
-
+extern int mcf_times;
 extern vector <pair<int,int>> best_answer;
 extern vector <int> DirectNode;
 
@@ -122,9 +121,12 @@ struct MCMF{
     int solveTimes = 0; // 记录一共调用了求解多少次
     int maxBandWidth;
     int levelNum = 0;
+    int mincost = 0;
+    int cost = 0;
 
-
-
+    /*+++++++++++++++zkw  变量++++++++++++++++++*/
+    bool vis[NODEMAX];
+    int oricost[EDGEMAX];
 
     int G[NODEMAX];
     Edge edge[EDGEMAX];
@@ -144,8 +146,10 @@ struct MCMF{
     void addEdge(int from,int to,int capacity,int cost){
 
         edge[++edgeorder] = Edge(to,capacity,cost,G[from]);
+        oricost[edgeorder] = cost;
         G[from] = edgeorder;
         edge[++edgeorder] = Edge(from,0,-cost,G[to]);
+        oricost[edgeorder] = -cost;
         G[to] = edgeorder;
         ++out_degree[from];
         out_flow[from] += capacity;
@@ -153,12 +157,52 @@ struct MCMF{
 
 
 
-/*+++++++++++++++建图only once++++++++++++++++++*/
+    /*+++++++++++++++zkw aug++++++++++++++++++*/
+    int zkwAug(int node, int flow){
+        if( node == vSink){
+            mincost += cost * flow;
+            currentFlows += flow;
+            return flow;
+        }
+        vis[node] = true;
+        int tmp = flow;
+        for(int i = G[node]; i ; i = edge[i].next){
+
+            if(edge[i].flow && !edge[i].cost && !vis[edge[i].to]){
+                int delta = zkwAug(edge[i].to,tmp < edge[i].flow ? tmp : edge[i].flow );
+                edge[i].flow -= delta;
+                edge[i^1].flow += delta;
+                tmp -= delta;
+                if(!tmp) return flow;
+            }
+        }
+        return flow - tmp;
+    }
+/*+++++++++++++++zkw modlabel()++++++++++++++++++*/
+    bool zkwModlabel()
+    {
+        int delta = INF;
+        for(int u = 0; u < nodeNumber+2; ++u)
+            if(vis[u])
+                for(int i = G[u]; i ; i = edge[i].next) {
+                    if (edge[i].flow && !vis[edge[i].to] && edge[i].cost < delta) delta = edge[i].cost;
+                }
+        if(delta == INF) return false;
+        for(int u = 0; u < nodeNumber+2; u++)
+            if(vis[u])
+                for(int i = G[u]; i; i = edge[i].next) {
+                    edge[i].cost -= delta, edge[i ^ 1].cost += delta;
+                }
+        cost += delta;
+        return true;
+    }
+
+    /*+++++++++++++++建图only once++++++++++++++++++*/
 
     void buildGraph(char *topo[EDGEMAX]){
 
         int pos = 0;
-
+        mincost = 0;
 
         memset(G, 0, sizeof(G));
         memset(node_level,-1,sizeof(node_level));
@@ -350,21 +394,27 @@ struct MCMF{
 
 /*+++++++++++++++clear上次的计算内容，图置为初始情况(源点)++++++++++++++++++*/
     void clear(){
-
+        cost = 0;
         currentFlows = 0;
         flowCnt = 0;
+        mincost = 0;
+
         memset(dist,63,sizeof(dist));
         memset(inQueue,0,sizeof(inQueue));
         memset(preV,0,sizeof(preV));
         memset(preE,0,sizeof(preE));
         memset(node_actual_flow,0,sizeof(node_actual_flow));
         memset(node_level,0,sizeof(node_level));
-
+        memset(vis, 0 ,sizeof(vis));
         //memset(edge,0,sizeof(edge));
         //todo 所有边置为读进来的情况，注意有没有需要特殊处理的情况，比如汇点和源点
         for(int i = 2; i <= edgeorder; i += 2){
             edge[i].flow += edge[i^1].flow;
             edge[i^1].flow = 0;
+        }
+        //恢复cost
+        for(int i = 2; i <= edgeorder; ++i){
+            edge[i].cost = oricost[i];
         }
 
         for(auto it = server2edge.begin(); it != server2edge.end(); ++it){
@@ -413,10 +463,10 @@ struct MCMF{
         memset(preE,0,sizeof(preE));
 
         //todo 所有边置为读进来的情况，注意有没有需要特殊处理的情况，比如汇点和源点
-        for(int i = 2; i <= edgeorder; i += 2){
-            edge[i].flow += edge[i^1].flow;
-            edge[i^1].flow = 0;
-        }
+//        for(int i = 2; i <= edgeorder; i += 2){
+//            edge[i].flow += edge[i^1].flow;
+//            edge[i^1].flow = 0;
+//        }
 
         deleteServers(toDeletServers);
         addServers(toAddServers);
@@ -495,6 +545,16 @@ struct MCMF{
         return ans;
     }
 
+
+    int zkwSolve(){
+        solveTimes ++;
+        do{
+            do{
+                memset(vis,0,sizeof(vis));
+            }while (zkwAug(vSource,INF));
+        }while (zkwModlabel());
+        return mincost;
+    }
 /*+++++++++++++++统计所有信息++++++++++++++++++*/
 
     void statistic(){
@@ -517,7 +577,7 @@ struct MCMF{
             if (edge[i^1].flow  == 0)continue;
             int v = edge[i].to;
             source_server_flow[v] = edge[i^1].flow;
-//            cout << "node " << v << "    actual  "<<node_actual_flow[v] << " ability "<< min(out_flow[v],Level[node_level[v]].first) << endl;
+            cout << "node " << v << "    actual  "<<node_actual_flow[v] << " ability "<< min(out_flow[v],Level[node_level[v]].first) << endl;
             out_percent[v] = float(node_actual_flow[v]) / float(out_flow[v]) * 100;
         }
     }
@@ -603,22 +663,24 @@ struct MCMF{
             int last;
             for (auto v:tmpPre) {
                 if(v == vSink) continue;
-//                cout << v << " ";
+                cout << v << " ";
                 last = v;
             }
-//            cout << Net2Consumer[last];
-//            cout << endl;
+            cout << Net2Consumer[last];
+            cout << endl;
         }
         return haspath;
     }
 
     //输入服务器等级，计算总cost
     bool getTotalCost(vector<pair<int,int>> servers){
+        mcf_times += 1;
         better = false;
         clear();
         // 默认为用的最高级的case
         buildSource(servers);
-        auto flowTotalCost = solve();
+        auto flowTotalCost = zkwSolve();
+        cout << flowTotalCost << endl;
 //        if(!isFeasibleFlow()){
 //            return false;
 //        }
@@ -639,7 +701,7 @@ struct MCMF{
             }
         }
         statistic();
-//        cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
+        cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
     }
 };
 
@@ -647,6 +709,6 @@ struct MCMF{
 
 void deploy_server(char * graph[MAX_EDGE_NUM], int edge_num, char * filename);
 
-	
+
 
 #endif

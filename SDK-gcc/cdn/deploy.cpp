@@ -10,6 +10,7 @@ int current_cost;
 
 int num_level;
 
+int mcf_times = 0;
 vector <pair<int,int>> best_answer;
 vector <int> DirectNode;
 
@@ -296,20 +297,32 @@ vpii getAnswerFromConsumerLost(vpii servers){
     return servers;
 }
 
-
-
-
 vector<pair<int,int>>adjustNodes(vector<pair<int,int>> nodes){
     //todo 需要策略去做这些事情
-    //todo 如果服务器等级很低，即性价比比较低，同时服务器的实际输出比它的能高，同时出度还没有满足，那么我们升级服务器，当然不能升到最高级
-    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-        if(it->second == 0)continue;
-        while(it->second != 0 && node_actual_flow[it->first] <= Level[it->second - 1].first) {
-            it->second -= 1;
+    // todo 如果服务器等级很低，即性价比比较低，同时服务器的实际输出比它的能高，同时出度还没有满足，那么我们升级服务器，当然不能升到最高级
+        for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+            if(it->second == 0)continue;
+            while(it->second != 0 && node_actual_flow[it->first] <= Level[it->second - 1].first) {
+                it->second -= 1;
+            }
+    // todo 很关键
+            node_level[it->first] = it->second < 0 ? 0 : it->second;
         }
-    }
-    return nodes;
+        return nodes;
 };
+
+
+//vector<pair<int,int>>adjustNodes(vector<pair<int,int>> nodes){
+//    //todo 需要策略去做这些事情
+//    //todo 如果服务器等级很低，即性价比比较低，同时服务器的实际输出比它的能高，同时出度还没有满足，那么我们升级服务器，当然不能升到最高级
+//    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+//        if(it->second == 0)continue;
+//        while(it->second != 0 && node_actual_flow[it->first] <= Level[it->second - 1].first) {
+//            it->second -= 1;
+//        }
+//    }
+//    return nodes;
+//};
 
 vector<pair<int,int>> addServer(vpii answer,vector<int> server){
     for(auto it = server.begin(); it != server.end(); ++it){
@@ -337,7 +350,7 @@ vector<pair<int,int>> shengjidayu(vector<pair<int,int>> servers){
         int v = it->first;
         float ability = min(out_flow[v],Level[node_level[v]].first);
         if (node_actual_flow[v] > ability){
-            if (it->second < MCF.levelNum - 1)
+            if (it->second < num_level - 1)
                 ++it->second;
         }
     }
@@ -479,8 +492,8 @@ vpii addServersFromConsumer(vpii servers,vector<int>nodes){
             intersection.insert(nodes[i]);
             continue;
         }
-        node_level[nodes[i]] = 0;
-        servers.push_back(make_pair(nodes[i],0));
+        node_level[nodes[i]] = getLevel(consumer_needed_flow[nodes[i]] - node_actual_flow[nodes[i]]);
+        servers.push_back(make_pair(nodes[i],getLevel(consumer_needed_flow[nodes[i]] - node_actual_flow[nodes[i]])));
     }
     for(auto it = servers.begin(); it != servers.end(); ++it){
         if(intersection.count(it->first)) {
@@ -638,9 +651,32 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
     result_1 = adjustNodes(result_1);
     MCF.getTotalCost(result_1);
 
+
+//    result_1.clear();
+//    for (int zz = 0; zz < MCF.nodeNumber; ++zz){
+//        if (consumer_needed_flow.find(zz) == consumer_needed_flow.end())
+//            result_1.push_back(pair<int,int>(zz,num_level-1));
+//    }
+//
+//    MCF.getTotalCost(result_1);
+////    result_1 = adjustNodes(result_1);
+////    MCF.getTotalCost(result_1);
+//    vector<int> tmp_consumer = notEnoughConsumers();
+//    result_1 = addServersFromConsumer(result_1,tmp_consumer);
+//    MCF.getTotalCost(result_1);
+//    result_1 = adjustNodes(result_1);
+//    MCF.getTotalCost(result_1);
+//    cout << MCF.isFeasibleFlow() << endl;
+
+
+//    for (auto zz = consumer_needed_flow.begin(); zz != consumer_needed_flow.end(); ++zz){
+//        result_1.push_back(pair<int,int>(zz->first,getLevel(zz->second)));
+//    }
+
 //    result_1 = shengjidayu(result_1);
 //    MCF.getTotalCost(result_1);
 
+    result_1 = shengjidayu(result_1);
     sort(result_1.begin(),result_1.end(),cmp_level_up1);
     int iter_num = result_1.size();
     vpii::iterator it = result_1.begin();
@@ -656,8 +692,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
         if (!MCF.isFeasibleFlow()){
             vector<int> tmp_consumer = notEnoughConsumers();
             a2 = result_1;
-//            a2 = addServersFromConsumer(a2,tmp_consumer);
-            a2 = budian(a2,tmp_consumer);
+            a2 = addServersFromConsumer(a2,tmp_consumer);
+//            a2 = budian(a2,tmp_consumer);
             MCF.getTotalCost(a2);
             result_1.push_back(now);
         }
@@ -765,6 +801,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 	write_result(topo_file, filename);
 #ifdef PRINT_TIME
 	printf("now time is %d\n",return_time());
+    cout << "net flow run " << mcf_times << " times" << endl;
 #endif
 }
 
