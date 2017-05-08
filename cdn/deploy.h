@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <unordered_map>
 #include <stdint.h>
+#include <random>
+#include <chrono>
 
 
 
@@ -577,7 +579,7 @@ struct MCMF{
             if (edge[i^1].flow  == 0)continue;
             int v = edge[i].to;
             source_server_flow[v] = edge[i^1].flow;
-            cout << "node " << v << "    actual  "<<node_actual_flow[v] << " ability "<< min(out_flow[v],Level[node_level[v]].first) << endl;
+//            cout << "node " << v << "    actual  "<<node_actual_flow[v] << " ability "<< min(out_flow[v],Level[node_level[v]].first) << endl;
             out_percent[v] = float(node_actual_flow[v]) / float(out_flow[v]) * 100;
         }
     }
@@ -663,11 +665,11 @@ struct MCMF{
             int last;
             for (auto v:tmpPre) {
                 if(v == vSink) continue;
-                cout << v << " ";
+//                cout << v << " ";
                 last = v;
             }
-            cout << Net2Consumer[last];
-            cout << endl;
+//            cout << Net2Consumer[last];
+//            cout << endl;
         }
         return haspath;
     }
@@ -680,7 +682,7 @@ struct MCMF{
         // 默认为用的最高级的case
         buildSource(servers);
         auto flowTotalCost = zkwSolve();
-        cout << flowTotalCost << endl;
+//        cout << flowTotalCost << endl;
 //        if(!isFeasibleFlow()){
 //            return false;
 //        }
@@ -701,7 +703,7 @@ struct MCMF{
             }
         }
         statistic();
-        cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
+//        cout <<"totalPrice : " <<totalPrice << "   total_needed_lost "<< total_lost_flow << " answer.size  "<< servers.size()<< endl;
     }
 };
 

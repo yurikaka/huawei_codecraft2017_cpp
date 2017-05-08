@@ -348,7 +348,7 @@ vector<pair<int,int>> upperServer(vpii answer,vector<int> server){
 vector<pair<int,int>> shengjidayu(vector<pair<int,int>> servers){
     for(auto it = servers.begin(); it != servers.end(); ++it){
         int v = it->first;
-        float ability = min(out_flow[v],Level[node_level[v]].first);
+        int ability = min(out_flow[v],Level[node_level[v]].first);
         if (node_actual_flow[v] > ability){
             if (it->second < num_level - 1)
                 ++it->second;
@@ -538,16 +538,16 @@ vector<pair<int,int>> bfs(vector<int> servers,vector<int> consumers){
     }
     unordered_map<int,int> tmpmap;
     for(auto c : consumers){
-        cout << "cousumer  " << c << ": servers";
+//        cout << "cousumer  " << c << ": servers";
         for(auto it = consumerMap[c].begin(); it != consumerMap[c].end(); ++it){
-            cout << " " << *it << " ";
+//            cout << " " << *it << " ";
             if(tmpmap.count(*it)){
                 tmpmap[*it] += 1;
             }else{
                 tmpmap[*it] = 1;
             }
         }
-        cout << endl;
+//        cout << endl;
     }
     vpii res;
     for(auto it = tmpmap.begin(); it != tmpmap.end(); ++it){
@@ -688,7 +688,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
             int iter_num = result_1.size();
             vpii::iterator it = result_1.begin();
             while (iter_num--) {
-                if (return_time() > 87)
+                if (return_time() > 88)
                     break;
                 it = result_1.begin();
                 pair<int, int> now = *it;
@@ -700,8 +700,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
                     vector<int> tmp_consumer = notEnoughConsumers();
                     a2 = result_1;
                     a2 = addServersFromConsumer(a2, tmp_consumer);
-//            a2 = budian(a2,tmp_consumer);
-                    MCF.getTotalCost(a2);
+//                    a2 = budian(a2,tmp_consumer);
                     result_1.push_back(now);
                 } else if (all_cost == last_cost) {
 
@@ -716,7 +715,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 
     unordered_set<int> nownow;
     vector<int> notin;
-    if (return_time() < 87){
+    if (return_time() < 88){
         for (auto it3 = best_answer.begin(); it3 != best_answer.end(); ++it3){
             nownow.insert(it3->first);
         }
@@ -725,6 +724,8 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
                 notin.push_back(z);
         }
         sort(notin.begin(),notin.end(),cmp_flow_down);
+//        unsigned seed = chrono::system_clock::now ().time_since_epoch ().count ();
+//        shuffle (notin.begin (), notin.end (), default_random_engine (seed));
 //        for (auto it4 = notin.begin(); it4 != notin.end(); it4+=2){
 //            if (return_time() > 82)
 //                break;
@@ -735,7 +736,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
 //            if (getLevel(node_actual_flow[*(it4+1)]) != -1)
 //                result_1.push_back(pair<int,int>(*(it4+1),getLevel(node_actual_flow[*(it4+1)])));
         for (auto it4 = notin.begin(); it4 != notin.end(); ++it4){
-            if (return_time() > 87)
+            if (return_time() > 88)
                 break;
             if (node_actual_flow[*it4] == 0)
                 break;
@@ -745,7 +746,7 @@ void deploy_server(char * topo[MAX_EDGE_NUM], int line_num, char * filename)
             auto iter_num = result_1.size();
             auto it = result_1.begin();
             while (iter_num--) {
-                if (return_time() > 87)
+                if (return_time() > 88)
                     break;
                 it = result_1.begin();
                 pair<int, int> now = *it;
